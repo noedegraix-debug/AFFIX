@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#04070d">
+<title>Blue Dash</title>
+<style>
+:root{--bg:#04070d;--card:rgba(20,32,58,.72);--bd:rgba(255,255,255,.09);--tx:#eef2fa;--dim:#8f9bb5;--a:#3b82f6;--b:#22d3ee;--ic:#60a5fa;--amb:#eab308;--grn:#4ade80;--red:#fca5a5;--ease:cubic-bezier(.16,1,.3,1);--easeStd:cubic-bezier(.4,0,.2,1);--spring:cubic-bezier(.34,1.56,.64,1)}
+@keyframes riseIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes popIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+html{scroll-behavior:smooth}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--tx);font-family:Inter,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+body{background:radial-gradient(120% 55% at 50% 0,#1f4b93 0,#0a1a36 40%,transparent 75%),radial-gradient(90% 45% at 80% 105%,#127080 0,transparent 70%),var(--bg);background-attachment:fixed;min-height:100vh}
+#app{max-width:547px;margin:0 auto}
+header{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:9px 20px;padding-top:calc(14px + env(safe-area-inset-top,0px));background:rgba(4,8,16,.88);backdrop-filter:blur(10px);border-bottom:1px solid rgba(96,165,250,.18)}
+header b{font-size:14px;font-weight:700}
+.burger{width:46px;height:39px;border-radius:10px;border:0;background:rgba(30,45,78,.7);color:var(--tx);display:grid;place-items:center;cursor:pointer;transition:transform .18s var(--spring),background-color .2s ease}
+.burger:active{transform:scale(.88)}
+main{padding:14px 20px 60px;animation:riseIn .5s var(--ease)}
+main>.card,main>.stats>.stat,main>.stat{animation:riseIn .5s var(--ease) backwards}
+main>.card:nth-child(1),main>.stats:nth-child(1)>.stat{animation-delay:.03s}
+main>.card:nth-child(2),main>.stats:nth-child(1)>.stat:nth-child(2){animation-delay:.08s}
+main>.card:nth-child(3){animation-delay:.13s}
+main>.card:nth-child(4){animation-delay:.18s}
+main>.card:nth-child(5){animation-delay:.23s}
+main>.card:nth-child(6){animation-delay:.28s}
+main>.card:nth-child(n+7){animation-delay:.32s}
+h1{font-size:27px;line-height:1.1;font-weight:800;margin:4px 0 6px;letter-spacing:-.02em}
+.sub{color:var(--dim);font-size:13px;line-height:1.45;margin:0 0 20px}
+.card{background:linear-gradient(160deg,rgba(28,44,80,.75),rgba(10,18,34,.85));border:1px solid var(--bd);border-radius:17px;padding:15px;margin-bottom:13px;position:relative}
+.card h3{margin:0 0 10px;font-size:14px;font-weight:700}
+.card{transition:transform .25s var(--ease),box-shadow .25s var(--ease)}
+@media(hover:hover){.card:hover{transform:translateY(-2px);box-shadow:0 14px 34px rgba(0,0,0,.35)}}
+.card p{color:var(--dim);font-size:12px;line-height:1.5;margin:0 0 14px}
+.inner{background:rgba(255,255,255,.05);border:1px solid var(--bd);border-radius:11px;padding:10px;margin-bottom:10px}
+.inner small{display:block;color:var(--dim);font-weight:600;margin-bottom:4px;font-size:11px}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace;word-break:break-all;font-size:12px}
+.btn{border:0;border-radius:11px;padding:10px 26px;font-size:13px;font-weight:700;color:#04121f;background:linear-gradient(90deg,var(--a),var(--b));box-shadow:0 10px 30px rgba(34,150,240,.35);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:inherit;transition:transform .16s var(--spring),box-shadow .2s var(--easeStd),opacity .2s ease,filter .2s ease}
+.btn:active{transform:scale(.95);box-shadow:0 4px 14px rgba(34,150,240,.3)}
+.btn:hover{filter:brightness(1.06)}
+.btn.g{background:rgba(255,255,255,.03);color:var(--tx);border:1px solid var(--bd);box-shadow:none}
+.btn.g:active{transform:scale(.95);background:rgba(255,255,255,.08)}
+.btn.g:hover{filter:none;background:rgba(255,255,255,.07)}
+.btn.s{padding:6px 18px;font-size:11px;border-radius:8px}
+.btn.danger{background:transparent;color:var(--red);border:1px solid rgba(252,165,165,.4);box-shadow:none}
+.btn.danger:active{transform:scale(.95);background:rgba(252,165,165,.1)}
+.btn.block{width:100%}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row>*{flex:1}
+.row>.n{flex:0 0 auto}
+label{display:block;font-size:10px;letter-spacing:.06em;font-weight:700;color:var(--dim);text-transform:uppercase;margin:13px 0 8px}
+input,select,textarea{width:100%;background:#070c17;border:1px solid var(--bd);border-radius:11px;padding:11px 18px;color:var(--tx);font-size:13px;font-family:inherit;outline:0;transition:border-color .2s var(--easeStd),box-shadow .2s var(--easeStd),background-color .2s ease}
+input:focus,textarea:focus,select:focus{border-color:var(--a);box-shadow:0 0 0 4px rgba(59,130,246,.16);background:#0a1120}
+input::placeholder,textarea::placeholder{color:#5d6a85}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:13px}
+.stat{background:linear-gradient(160deg,rgba(28,44,80,.7),rgba(10,18,34,.85));border:1px solid var(--bd);border-radius:17px;padding:15px 22px}
+.stat span{display:block;font-size:10px;letter-spacing:.09em;font-weight:700;color:var(--dim);text-transform:uppercase;margin-bottom:7px}
+.stat b{font-size:29px;font-weight:800;letter-spacing:-.02em;white-space:nowrap}
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:599px;padding:6px 18px;font-weight:700;font-size:12px;border:1px solid var(--bd)}
+.pill.ok{color:var(--grn);border-color:rgba(74,222,128,.45);background:rgba(74,222,128,.08)}
+.pill.b{color:#7cc4ff;border-color:rgba(96,165,250,.5);background:rgba(59,130,246,.1)}
+.badge{background:var(--amb);color:#1a1200;border-radius:599px;font-weight:800;font-size:11px;padding:4px 11px}
+.tabs{display:flex;background:rgba(255,255,255,.03);border-radius:13px;padding:4px;margin-bottom:6px}
+.tabs button{flex:1;border:0;background:none;color:var(--tx);font-weight:700;font-size:12px;padding:10px 8px;border-radius:11px;font-family:inherit;cursor:pointer;transition:background-color .3s var(--easeStd),color .3s var(--easeStd),transform .15s var(--spring)}
+.tabs button.on{background:linear-gradient(90deg,var(--a),var(--b));color:#04121f;animation:popIn .35s var(--ease)}
+.tabs button:active{transform:scale(.95)}
+.tw{overflow-x:auto;padding:0}
+table{width:100%;border-collapse:collapse;min-width:374px}
+th{text-align:left;font-size:10px;letter-spacing:.08em;color:var(--dim);text-transform:uppercase;padding:11px 16px;font-weight:700}
+td{padding:12px 16px;border-top:1px solid rgba(255,255,255,.06);font-size:13px}
+tr.click{cursor:pointer;transition:background-color .2s ease}
+tr.click:active{background:rgba(255,255,255,.05)}
+@media(hover:hover){tr.click:hover{background:rgba(255,255,255,.04)}}
+.code{background:rgba(255,255,255,.07);border-radius:7px;padding:4px 14px;font-family:ui-monospace,monospace;font-size:12px}
+.blue{color:#7cc4ff;font-weight:800}
+.empty{color:var(--dim);text-align:center;padding:19px 16px;font-size:12px}
+.bar{height:14px;background:rgba(255,255,255,.1);border-radius:59px;overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--a),var(--b));border-radius:59px}
+.drawer{position:fixed;inset:0;z-index:15;background:rgba(3,6,12,.97);backdrop-filter:blur(10px);padding:62px 22px 30px;overflow:auto;opacity:0;visibility:hidden;transform:translateY(-10px);transition:opacity .32s var(--easeStd),transform .32s var(--ease),visibility 0s linear .32s}
+.drawer.on{opacity:1;visibility:visible;transform:translateY(0);transition:opacity .32s var(--easeStd),transform .32s var(--ease),visibility 0s}
+.drawer a{display:flex;align-items:center;gap:13px;padding:12px 22px;border-radius:12px;color:#dfe6f5;font-weight:600;font-size:15px;text-decoration:none;border:1px solid transparent;margin-bottom:4px;cursor:pointer;transition:background-color .2s ease,transform .15s var(--spring),border-color .2s ease;animation:riseIn .4s var(--ease) backwards}
+.drawer a:active{transform:scale(.97)}
+.drawer.on a:nth-child(1){animation-delay:.04s}.drawer.on a:nth-child(2){animation-delay:.08s}.drawer.on a:nth-child(3){animation-delay:.12s}.drawer.on a:nth-child(4){animation-delay:.16s}.drawer.on a:nth-child(5){animation-delay:.2s}.drawer.on a:nth-child(6){animation-delay:.24s}.drawer.on a:nth-child(7){animation-delay:.28s}.drawer.on a:nth-child(8){animation-delay:.32s}.drawer.on a:nth-child(9){animation-delay:.36s}
+.drawer a.on{background:rgba(35,70,130,.5);border-color:rgba(96,165,250,.45);color:#cfe3ff}
+.drawer a svg{color:var(--ic);flex:0 0 auto}
+.drawer a .badge{margin-left:auto}
+.faq{background:linear-gradient(160deg,rgba(28,44,80,.7),rgba(10,18,34,.85));border:1px solid var(--bd);border-radius:16px;padding:14px 24px;margin-bottom:10px}
+.faq summary{font-weight:700;font-size:14px;cursor:pointer;list-style:none}
+.faq summary::before{content:"▶ ";font-size:12px}
+.faq p{margin:8px 0 0;color:var(--dim);font-size:12px;line-height:1.5}
+.sec{font-size:12px;letter-spacing:.12em;color:var(--dim);text-transform:uppercase;margin:18px 0 12px;font-weight:500}
+.warn{border-color:rgba(200,90,110,.45)}
+.step{display:flex;gap:10px;align-items:center;margin-bottom:8px}
+.step i{width:37px;height:37px;border-radius:50%;background:linear-gradient(135deg,var(--a),var(--b));color:#04121f;font-style:normal;font-weight:800;font-size:16px;display:grid;place-items:center;flex:0 0 auto}
+.step h4{margin:0;font-size:17px}
+.note{background:rgba(59,130,246,.12);border:1px solid rgba(96,165,250,.4);color:#8ec5ff;border-radius:11px;padding:10px;font-size:12px}
+.game{display:flex;align-items:center;gap:13px;padding:14px;border-radius:18px;border:1px solid rgba(234,179,8,.35);background:linear-gradient(160deg,rgba(40,50,80,.7),rgba(10,16,32,.85));margin-bottom:11px;color:#fde68a;font-size:17px;font-weight:800;text-decoration:none}
+.game .gi{width:49px;height:49px;border-radius:12px;background:rgba(120,90,20,.5);display:grid;place-items:center;border:1px solid rgba(234,179,8,.4)}
+.game svg.s{margin-left:auto;color:#fff}
+.msg{display:flex;justify-content:space-between;gap:8px;padding:12px 24px;border-top:1px solid rgba(255,255,255,.06);cursor:pointer}
+.msg b{font-size:17px;display:block;margin-bottom:4px}
+.msg span{color:var(--dim);font-size:13px}
+.bub{max-width:82%;padding:7px 16px;border-radius:11px;margin-bottom:7px;font-size:12px;line-height:1.4}
+.bub.me{margin-left:auto;background:linear-gradient(90deg,var(--a),var(--b));color:#04121f}
+.bub.o{background:rgba(255,255,255,.08)}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(10px);background:#14213f;border:1px solid var(--bd);padding:9px 22px;border-radius:59px;font-size:12px;opacity:0;pointer-events:none;transition:opacity .3s var(--ease),transform .3s var(--ease);z-index:50;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+.login{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:15px;animation:popIn .55s var(--ease)}
+.login h2{text-align:center;font-size:23px;margin:0 0 26px}
+.chk{display:flex;align-items:center;gap:14px;font-size:14px;margin:10px 0;cursor:pointer;user-select:none}
+.chk input{position:absolute;opacity:0;width:0;height:0}
+.chk .sw{position:relative;width:46px;height:27px;background:rgba(255,255,255,.14);border-radius:99px;transition:background-color .25s var(--easeStd);flex:0 0 auto}
+.chk .sw::after{content:"";position:absolute;top:2px;left:2px;width:23px;height:23px;background:#fff;border-radius:50%;transition:transform .3s var(--spring);box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.chk input:checked+.sw{background:linear-gradient(90deg,var(--a),var(--b))}
+.chk input:checked+.sw::after{transform:translateX(19px)}
+.rlink{display:flex;gap:8px}
+.rlink input{flex:1}
+.x{flex:0 0 auto;width:auto;padding:7px 22px;border-radius:59px;background:transparent;border:1px solid var(--bd);color:var(--ic);font-size:14px;cursor:pointer;transition:transform .16s var(--spring),background-color .2s ease}
+.x:active{transform:scale(.9);background:rgba(255,255,255,.06)}
+.seg{display:inline-flex;background:#070c17;border:1px solid var(--bd);border-radius:59px;padding:4px}
+.seg button{border:0;background:none;color:var(--dim);font-weight:700;font-size:14px;padding:7px 24px;border-radius:59px;cursor:pointer;font-family:inherit;transition:background-color .3s var(--easeStd),color .3s var(--easeStd),transform .15s var(--spring)}
+.seg button.on{background:linear-gradient(90deg,var(--a),var(--b));color:#04121f;animation:popIn .3s var(--ease)}
+.seg button:active{transform:scale(.93)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+<script>
+/* ============ ÉTAT (stocké dans le navigateur, comme Lexora Dash) ============ */
+const KEY='bluedash_v1';
+const uid=()=>Math.random().toString(36).slice(2,10);
+const def=()=>({
+ settings:{adminCode:'Admin2024',mainLink:'',syncUrl:'',syncKey:'',tgOn:false,tgToken:'',tgChat:'',refComm:5,
+  tiers:[{ftd:10,reward:50},{ftd:100,reward:500},{ftd:500,reward:1000},{ftd:1000,reward:2000},{ftd:2000,reward:4000}],
+  wDay:10,param:'sub1',games:[],useful:[],community:[]},
+ subs:[],payments:[],msgs:{},rewardsClaimed:{},announce:[]
+});
+let S=(()=>{try{const s=JSON.parse(localStorage.getItem(KEY));return s?Object.assign(def(),s,{settings:Object.assign(def().settings,s.settings)}):def()}catch(e){return def()}})();
+const save=()=>localStorage.setItem(KEY,JSON.stringify(S));
+let session=(()=>{try{return JSON.parse(sessionStorage.getItem('bd_sess'))}catch(e){return null}})();
+let page='home',tab='m',drawer=false,editing=null,chartMode='j';
+const $=s=>document.querySelector(s);
+const eur=n=>(Number(n)||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),1900)}
+function copy(t){navigator.clipboard?.writeText(t).then(()=>toast('Copié !'),()=>toast('Copie impossible'))}
+const me=()=>session&&session.role==='m'?S.subs.find(s=>s.id===session.id):null;
+const fmtD=d=>new Date(d).toLocaleDateString('fr-FR');
+const withSub=(u,c)=>{if(!u)return'';const p=S.settings.param||'sub1';return u+(u.includes('?')?'&':'?')+p+'='+encodeURIComponent(c)};
+const stat=s=>Object.assign({inscriptions:0,ftd:0,deposits:0,ca:0},s.stats||{});
+const earned=s=>stat(s).ftd*(+s.commission||0);
+const withdrawn=id=>S.payments.filter(p=>p.subId===id&&p.type==='w'&&p.status!=='refused').reduce((a,p)=>a+p.amount,0);
+const rewardsSum=id=>S.payments.filter(p=>p.subId===id&&p.type==='r').reduce((a,p)=>a+p.amount,0);
+const balance=s=>earned(s)-withdrawn(s.id);
+
+/* ============ ICÔNES ============ */
+const I=(d,z=20)=>`<svg width="${z}" height="${z}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const ic={
+ grid:I('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'),
+ users:I('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 4.6a3.5 3.5 0 010 6.8M18 14.4c2.2.6 3.5 2.6 3.5 5.6"/>'),
+ wallet:I('<path d="M4 7a2 2 0 012-2h11v4"/><path d="M4 7v11a2 2 0 002 2h13a1 1 0 001-1v-9a1 1 0 00-1-1H6a2 2 0 01-2-2z"/><circle cx="16.5" cy="14.5" r="1.2"/>'),
+ chat:I('<path d="M21 12a8 8 0 01-11.6 7.1L4 20l1-4.6A8 8 0 1121 12z"/>'),
+ gift:I('<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M5 12v8a1 1 0 001 1h12a1 1 0 001-1v-8M8.5 8C6 8 6 4 8.5 4 11 4 12 8 12 8s1-4 3.5-4C18 4 18 8 15.5 8"/>'),
+ bulb:I('<path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0012 3z"/>'),
+ gear:I('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>'),
+ out:I('<path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>'),
+ book:I('<path d="M4 4.5A2.5 2.5 0 016.5 2H20v17H6.5A2.5 2.5 0 004 21.5z"/><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>'),
+ play:I('<rect x="3" y="3" width="18" height="18" rx="5"/><path d="M10 8.5l5 3.5-5 3.5z"/>'),
+ bell:I('<path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0"/>',18),
+ sync:I('<path d="M21 12a9 9 0 01-15.5 6.2L3 16M3 12a9 9 0 0115.5-6.2L21 8M21 3v5h-5M3 21v-5h5"/>',18),
+ search:I('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',19),
+ copy:I('<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/>',18),
+ send:I('<path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/>',18),
+ shield:I('<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>'),
+ menu:I('<path d="M4 7h16M4 12h16M4 17h16"/>',22)
+};
+
+/* ============ NAVIGATION ============ */
+const NAV_A=[['home','Vue d\'ensemble','grid'],['subs','Sous-affiliés','users'],['pay','Paiements','wallet'],['msg','Messages','chat'],['ref','Parrainages','gift'],['tips','Conseils & Stratégie','bulb'],['set','Paramètres','gear']];
+const NAV_M=[['home','Mon tableau de bord','grid'],['tuto','Tutoriel','book'],['msg','Messages','chat'],['bal','Solde & Retraits','wallet'],['rew','Rewards','gift'],['ref','Parrainage','gift'],['tips','Conseils & Stratégie','bulb'],['games','Jeux','play'],['comm','Communauté','users']];
+function go(p){page=p;drawer=false;editing=null;render();window.scrollTo(0,0)}
+function login(role,id){session={role,id};sessionStorage.setItem('bd_sess',JSON.stringify(session));page='home';render()}
+function logout(){session=null;sessionStorage.removeItem('bd_sess');drawer=false;render()}
+
+/* ============ RENDU ============ */
+function render(){
+ const app=$('#app');
+ if(!session){app.innerHTML=loginView();return}
+ const adm=session.role==='a';
+ if(!adm&&!me()){logout();return}
+ const nav=adm?NAV_A:NAV_M;
+ const badge=k=>!adm&&k==='bal'&&canWithdraw()?`<span class="badge">!</span>`:'';
+ app.innerHTML=`<header><b>Blue Dash</b><button class="burger" onclick="drawer=!drawer;render()">${ic.menu}</button></header>
+ <div class="drawer ${drawer?'on':''}">${nav.map(n=>`<a class="${page===n[0]?'on':''}" onclick="go('${n[0]}')">${ic[n[2]]}<span>${n[1]}</span>${badge(n[0])}</a>`).join('')}<a onclick="logout()">${ic.out}<span>Déconnexion</span></a></div>
+ <main>${adm?adminPage():memberPage()}</main>`;
+ requestAnimationFrame(animateStats);
+}
+function animateStats(){
+ document.querySelectorAll('.stat b').forEach(el=>{
+  if(el.dataset.animated)return;el.dataset.animated='1';
+  const txt=el.textContent.trim();const m=txt.match(/^(-?[\d.,\s]+)(.*)$/);if(!m)return;
+  const numStr=m[1].replace(/\s/g,'').trim(),suffix=m[2];
+  const target=parseFloat(numStr.replace(',','.'));if(isNaN(target))return;
+  const decimals=(numStr.split(',')[1]||'').length;
+  let t0=null;const dur=750;
+  function step(ts){if(!t0)t0=ts;const p=Math.min(1,(ts-t0)/dur);const eased=1-Math.pow(1-p,3);const cur=target*eased;
+   el.textContent=(decimals?cur.toLocaleString('fr-FR',{minimumFractionDigits:decimals,maximumFractionDigits:decimals}):Math.round(cur).toLocaleString('fr-FR'))+suffix;
+   if(p<1)requestAnimationFrame(step);else el.dataset.animated=''}
+  requestAnimationFrame(step);
+ });
+}
+function loginView(){
+ const T={m:'Espace membre',a:'Espace admin'};
+ let f='';
+ if(tab==='m')f=`<label>Nom</label><input id="ln" placeholder="Votre nom"><label>Code d'accès</label><input id="lc" type="password" placeholder="Votre code"><div style="height:17px"></div><button class="btn block" onclick="doLogin()">Se connecter</button>`;
+ if(tab==='a')f=`<label>Code admin</label><input id="ac" type="password" placeholder="Code d'accès admin"><div style="height:17px"></div><button class="btn block" onclick="doAdmin()">Se connecter</button>`;
+ return `<div class="login"><h2>Blue Dash</h2><div class="card" style="padding:14px"><div class="tabs">${Object.keys(T).map(k=>`<button class="${tab===k?'on':''}" onclick="tab='${k}';render()">${T[k]}</button>`).join('')}</div><div style="padding:0 10px 10px">${f}</div></div><p style="text-align:center;color:#5d6a85;font-size:12px;padding:0 20px">Données stockées localement dans ce navigateur (voir Paramètres → Export/Import).</p></div>`;
+}
+function doLogin(){const n=$('#ln').value.trim().toLowerCase(),c=$('#lc').value.trim();const s=S.subs.find(x=>x.name.toLowerCase()===n&&x.code===c);s?login('m',s.id):toast('Nom ou code incorrect')}
+function doAdmin(){$('#ac').value===S.settings.adminCode?login('a'):toast('Code admin incorrect')}
+
+/* ============ ADMIN ============ */
+function adminPage(){return({home:aHome,subs:aSubs,pay:aPay,msg:aMsg,ref:aRef,tips:tips,set:aSet})[page]()}
+function aHome(){
+ const n=S.subs.length,act=S.subs.filter(s=>stat(s).ftd>0||stat(s).inscriptions>0).length;
+ const ca=S.subs.reduce((a,s)=>a+stat(s).ca,0);
+ const due=S.subs.reduce((a,s)=>a+balance(s),0);
+ return `<h1>Vue d'ensemble</h1><p class="sub">Performance globale de votre réseau de sous-affiliés</p>
+ <div class="pill ok" style="margin-bottom:15px">${ic.bell} Notifications activées</div>
+ <div class="stats"><div class="stat"><span>Sous-affiliés</span><b>${n}</b></div><div class="stat"><span>Actifs</span><b>${act}</b></div><div class="stat"><span>Revenus générés</span><b>${eur(ca)}</b></div><div class="stat"><span>Commissions à payer</span><b>${eur(due)}</b></div></div>
+ <div class="card"><h3 style="font-size:19px">Revenus dans le temps</h3><p style="margin-bottom:11px">Tous sous-affiliés confondus</p><div class="seg">${[['j','Jour'],['s','Semaine'],['m','Mois']].map(x=>`<button class="${chartMode===x[0]?'on':''}" onclick="chartMode='${x[0]}';render()">${x[1]}</button>`).join('')}</div><div style="margin-top:14px">${chart()}</div></div>`;
+}
+function chart(){
+ const ev=S.subs.flatMap(s=>(s.events||[]).filter(e=>e.type==='ftd'||e.type==='deposit'));
+ const key=t=>{const d=new Date(t);if(chartMode==='m')return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');if(chartMode==='s'){const o=new Date(d);o.setDate(d.getDate()-((d.getDay()+6)%7));return o.toISOString().slice(0,10)}return d.toISOString().slice(0,10)};
+ const m={};ev.forEach(e=>{const k=key(e.t);m[k]=(m[k]||0)+(+e.commission||0)});
+ const ks=Object.keys(m).sort().slice(-12);
+ if(!ks.length)return `<div class="empty">Aucune donnée pour le moment.<br>Les revenus apparaissent après synchronisation des postbacks.</div>`;
+ const vals=ks.map(k=>m[k]),mx=Math.max(...vals,1),W=640,H=260,P=40;
+ const pts=vals.map((v,i)=>[P+(ks.length===1?(W-P)/2:i*(W-P-10)/(ks.length-1)),H-30-(v/mx)*(H-60)]);
+ return `<svg viewBox="0 0 ${W} ${H}" style="width:100%">${[0,1,2,3].map(i=>`<line x1="${P}" x2="${W}" y1="${30+i*(H-60)/3}" y2="${30+i*(H-60)/3}" stroke="rgba(255,255,255,.1)"/><text x="0" y="${34+i*(H-60)/3}" fill="#8f9bb5" font-size="13">${Math.round(mx*(1-i/3))}</text>`).join('')}<polyline fill="none" stroke="#22d3ee" stroke-width="3" points="${pts.map(p=>p.join(',')).join(' ')}"/>${pts.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="5" fill="#3b82f6"/>`).join('')}</svg>`;
+}
+function aSubs(){
+ if(editing!==null)return subForm();
+ const q=(window._q||'').toLowerCase();
+ const list=S.subs.filter(s=>!q||s.name.toLowerCase().includes(q)||s.code.toLowerCase().includes(q));
+ return `<h1>Sous-affiliés</h1><p class="sub">${S.subs.length} au total</p>
+ <div class="row" style="margin-bottom:14px"><button class="btn g" onclick="syncAll()">${ic.sync} Tout synchroniser</button><button class="btn" onclick="editing='new';render()">+ Nouveau sous-affilié</button></div>
+ <div style="position:relative;margin-bottom:13px"><input id="q" style="padding-left:58px" placeholder="Rechercher par nom ou code..." value="${esc(window._q||'')}" oninput="window._q=this.value;render();const e=$('#q');e.focus();e.setSelectionRange(99,99)"><span style="position:absolute;left:18px;top:16px;color:var(--ic)">${ic.search}</span></div>
+ <div class="card tw"><table><tr><th>Nom</th><th>Code</th><th>Commission</th><th>Revenu</th></tr>${list.map(s=>`<tr class="click" onclick="editing='${s.id}';render()"><td><b>${esc(s.name)}</b></td><td><span class="code">${esc(s.code)}</span></td><td>${eur(s.commission)}/FTD</td><td class="blue">${eur(earned(s))}</td></tr>`).join('')||`<tr><td colspan="4" class="empty">Aucun sous-affilié</td></tr>`}</table></div>`;
+}
+let formLinks=[];
+function subForm(){
+ const s=editing==='new'?{name:'',code:'',links:[{name:'Signup',url:''}],commission:30,landing:'',referrer:''}:S.subs.find(x=>x.id===editing);
+ if(!window._fl||window._fe!==editing){window._fl=(s.links||[]).map(l=>({...l}));window._fe=editing}
+ return `<h1>${editing==='new'?'Nouveau sous-affilié':esc(s.name)}</h1><p class="sub"></p><div class="card">
+ <label>Nom</label><input id="fn" placeholder="Ex : Jordan M." value="${esc(s.name)}">
+ <label>Code d'accès</label><div class="row"><input id="fc" placeholder="Ex : X7K2M9" value="${esc(s.code)}"><button class="btn g n" onclick="$('#fc').value=Math.random().toString(36).slice(2,8).toUpperCase()">Générer</button></div>
+ <p style="margin-top:13px">Liens de base (n'importe quel casino/site, optionnel — tu peux les ajouter plus tard)</p>
+ ${window._fl.map((l,i)=>`<div class="row" style="margin-bottom:7px;flex-wrap:nowrap"><input placeholder="Nom" value="${esc(l.name)}" oninput="_fl[${i}].name=this.value" style="flex:1"><input placeholder="https://votre-casino.com/..." value="${esc(l.url)}" oninput="_fl[${i}].url=this.value" style="flex:1.3"><button class="x n" onclick="_fl.splice(${i},1);render()">✕</button></div>`).join('')}
+ <button class="btn g s" onclick="_fl.push({name:'',url:''});render()">+ Ajouter un lien</button>
+ <p style="margin-top:10px">Le code d'accès sera ajouté automatiquement à la fin de chaque lien (&amp;${esc(S.settings.param)}=code).</p>
+ <label>Commission par FTD (€)</label><input id="fm" type="number" value="${s.commission}">
+ <label>Landing page (optionnel)</label><input id="fl" placeholder="https://ta-landing-page.com" value="${esc(s.landing||'')}">
+ <p style="margin-top:7px">💡 Une landing page dédiée aide généralement à mieux convertir sur TikTok qu'un lien direct vers le casino.</p>
+ <label>Parrainé par (optionnel)</label><select id="fr"><option value="">Aucun parrain</option>${S.subs.filter(x=>x.id!==s.id).map(x=>`<option value="${x.id}" ${x.id===s.referrer?'selected':''}>${esc(x.name)} (${esc(x.code)})</option>`).join('')}</select>
+ <div class="row" style="margin-top:18px"><button class="btn g" onclick="editing=null;window._fe=null;render()">Annuler</button><button class="btn" onclick="saveSub()">Enregistrer</button></div>
+ ${editing!=='new'?`<div class="row" style="margin-top:10px"><button class="btn g s" onclick="copy(location.href.split('?')[0])">Copier le lien du dash</button><button class="btn danger s" onclick="delSub()">Supprimer</button></div>`:''}</div>`;
+}
+function saveSub(){
+ const name=$('#fn').value.trim(),code=$('#fc').value.trim();if(!name||!code)return toast('Nom et code requis');
+ if(S.subs.some(x=>x.code===code&&x.id!==editing))return toast('Ce code existe déjà');
+ const d={name,code,links:_fl.filter(l=>l.url),commission:+$('#fm').value||0,landing:$('#fl').value.trim(),referrer:$('#fr').value};
+ if(editing==='new')S.subs.push({id:uid(),stats:{},events:[],created:Date.now(),...d});else Object.assign(S.subs.find(x=>x.id===editing),d);
+ save();editing=null;window._fe=null;toast('Enregistré');render();
+}
+function delSub(){if(!confirm('Supprimer ce sous-affilié ?'))return;S.subs=S.subs.filter(x=>x.id!==editing);save();editing=null;render()}
+function aPay(){
+ const pend=S.payments.filter(p=>p.status==='pending'),paid=S.payments.filter(p=>p.status==='paid');
+ const card=p=>{const s=S.subs.find(x=>x.id===p.subId)||{name:'?',code:''};return `<div class="card"><div class="row" style="flex-wrap:nowrap;gap:6px;justify-content:flex-start"><h3 style="margin:0;font-size:17px;flex:0 0 auto">${esc(s.name)}</h3><span class="code n" style="color:var(--dim)">${esc(s.code.slice(0,2))}</span></div><p style="margin:7px 0">${p.type==='w'?'Retrait mensuel (solde complet)':'Reward '+esc(p.label||'')} · <b style="color:var(--grn)">${eur(p.amount)}</b> · ${fmtD(p.date)}</p><p>${esc(p.details||'')}</p>${p.status==='paid'?`<span class="pill ok s">Payé le ${fmtD(p.paidAt)}</span>`:`<button class="btn s" onclick="markPaid('${p.id}')">Marquer payé</button>`} <button class="btn g s" onclick="delPay('${p.id}')">Supprimer</button></div>`};
+ return `<h1>Paiements</h1><p class="sub">Retraits mensuels et bonus rewards envoyés par les sous-affiliés, avec leurs coordonnées de paiement.</p><div class="card" style="display:flex;justify-content:space-between;align-items:center;padding:15px"><span style="color:var(--dim);font-size:13px">Demandes en attente</span><b style="font-size:26px">${pend.length}</b></div>${pend.length?`<div class="sec">En attente (${pend.length})</div>`+pend.map(card).join(''):''}<div class="sec" style="font-weight:700">Payées (${paid.length})</div>${paid.map(card).join('')||'<div class="empty">Aucun paiement.</div>'}`;
+}
+function markPaid(id){const p=S.payments.find(x=>x.id===id);p.status='paid';p.paidAt=Date.now();save();render()}
+function delPay(id){S.payments=S.payments.filter(x=>x.id!==id);save();render()}
+function aMsg(){
+ if(editing!==null&&editing!=='new'){const s=S.subs.find(x=>x.id===editing);const th=S.msgs[s.id]||[];return `<h1>${esc(s.name)}</h1><p class="sub"><a onclick="editing=null;render()" style="color:var(--ic);cursor:pointer">← Retour</a></p><div class="card">${th.map(m=>`<div class="bub ${m.from==='a'?'me':'o'}">${esc(m.text)}</div>`).join('')||'<div class="empty">Aucun message.</div>'}<div class="row" style="margin-top:10px;flex-wrap:nowrap"><input id="mt" placeholder="Ton message"><button class="btn n" onclick="sendMsg('${s.id}','a')">Envoyer</button></div></div>`}
+ return `<h1>Messages</h1><p class="sub">Conversations directes avec tes sous-affiliés.</p><button class="btn g s" onclick="render()" style="margin-bottom:14px">${ic.sync} Actualiser</button>
+ <div class="card"><h3 style="display:flex;gap:6px;align-items:center"><span style="color:var(--ic)">${ic.bell}</span>Notification à tous les membres</h3><p>Envoie une annonce visible par tous les sous-affiliés sur leur tableau de bord.</p><textarea id="an" rows="3" placeholder="Écris ton annonce ici..."></textarea><div style="text-align:right;margin-top:10px"><button class="btn" onclick="sendAnn()">Envoyer la notification</button></div></div>
+ <div class="card tw" style="padding:0">${S.subs.map(s=>{const th=S.msgs[s.id]||[],l=th[th.length-1];return `<div class="msg" onclick="editing='${s.id}';render()" style="border-top:0;border-bottom:1px solid rgba(255,255,255,.06)"><div><b>${esc(s.name)}</b><span>${l?esc(l.text.slice(0,40)):'Aucun message pour le moment.'}</span></div>${l?`<span style="white-space:nowrap;font-size:12px">${new Date(l.t).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})} · ${new Date(l.t).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</span>`:''}</div>`}).join('')||'<div class="empty">Aucun sous-affilié.</div>'}</div>`;
+}
+function sendMsg(id,from){const t=$('#mt').value.trim();if(!t)return;(S.msgs[id]=S.msgs[id]||[]).push({from,text:t,t:Date.now()});save();render()}
+function sendAnn(){const t=$('#an').value.trim();if(!t)return;S.announce.unshift({text:t,t:Date.now()});save();toast('Annonce envoyée');render()}
+function aRef(){
+ const withRef=S.subs.filter(s=>s.referrer);
+ const rows=withRef.map(f=>({p:S.subs.find(x=>x.id===f.referrer),f})).filter(r=>r.p);
+ const tot=rows.reduce((a,r)=>a+stat(r.f).ftd*S.settings.refComm,0);
+ return `<h1>Parrainages</h1><p class="sub">${rows.length} parrainage(s) actif(s) · Commission par FTD : ${eur(S.settings.refComm)}</p>
+ <div class="stats"><div class="stat"><span>Parrainages actifs</span><b>${rows.length}</b></div><div class="stat"><span>Commissions de parrainage</span><b>${eur(tot)}</b></div></div>
+ <div class="card"><h3>Attacher un parrainage manuellement</h3><p>Cherche par nom ou code, pour n'importe quel sous-affilié — utile pour corriger ou forcer un rattachement.</p><label>Filleul (celui qui est parrainé)</label><input id="rf" placeholder="Nom ou code..."><label>Parrain (laisser vide pour détacher)</label><div class="row" style="flex-wrap:nowrap"><input id="rp2" placeholder="Nom ou code..."><button class="btn n" onclick="attach()">Attacher</button></div></div>
+ <div class="card tw"><table><tr><th>Parrain</th><th>Filleul</th><th>FTD du filleul</th></tr>${rows.map(r=>`<tr><td>${esc(r.p.name)}</td><td>${esc(r.f.name)}</td><td>${stat(r.f).ftd}</td></tr>`).join('')||`<tr><td colspan="3" class="empty">Aucun parrainage pour le moment. Utilise le champ "Parrainé par" en créant/modifiant un sous-affilié.</td></tr>`}</table></div>`;
+}
+function attach(){const f=$('#rf').value.trim().toLowerCase(),p=$('#rp2').value.trim().toLowerCase();const find=v=>S.subs.find(s=>s.name.toLowerCase()===v||s.code.toLowerCase()===v);const F=find(f),P=p?find(p):null;if(!F)return toast('Filleul introuvable');if(p&&!P)return toast('Parrain introuvable');F.referrer=P?P.id:'';save();toast(P?'Rattaché':'Détaché');render()}
+const FAQ={Diffusion:[['Comment poster mon lien sur Telegram ?','Partage ton lien dans tes canaux et groupes avec une accroche claire. Évite le spam : apporte de la valeur avant de poster.'],['Comment poster mon lien sur Instagram ?','Mets ton lien dans la bio (Modifier le profil → Site web) et invite les gens à cliquer dans tes stories et posts.'],['Comment poster mon lien sur WhatsApp ?','Utilise ton statut, tes communautés ou des diffusions, sans harceler tes contacts.'],['Comment poster mon lien sur TikTok/YouTube ?','Lien en bio sur TikTok ; description et commentaire épinglé sur YouTube. Préfère ta landing page.']],
+ Contenu:[['Comment créer du contenu qui convertit vraiment ?','Accroche forte dans les 3 premières secondes, une promesse honnête, et un appel à l\'action clair en fin de vidéo.'],['Quelle fréquence de publication pour progresser vite ?','Vise 1 publication par jour au début, puis ajuste selon ce qui marche.'],['Comment varier mes formats sans m\'épuiser ?','Recycle une même idée en vidéo courte, story, carrousel et post texte.']],
+ Trafic:[['Sur quelles plateformes concentrer mes efforts ?','Commence par 1 ou 2 plateformes où ton audience est déjà présente, puis élargis.'],['Comment donner confiance aux gens avant qu\'ils cliquent ?','Sois transparent, montre ton expérience réelle et reste responsable.'],['Dois-je répondre aux commentaires/DM ?','Oui : répondre augmente l\'engagement et la confiance, donc les conversions.']],
+ Conversion:[['Mon taux de clic est bon mais peu de FTD, pourquoi ?','Vérifie que ton message correspond à l\'offre, teste une landing page et clarifie les étapes d\'inscription.'],['Comment relancer une audience qui n\'a pas encore franchi le pas ?','Republie avec un angle différent, réponds aux objections courantes et rappelle le lien en bio.']]};
+function tips(){
+ const q=(window._tq||'').toLowerCase();
+ return `<h1>Conseils & Stratégie</h1><p class="sub">Débloqué ✔ — conseils de contenu, de stratégie et d'optimisation.</p>
+ <div class="card warn"><h3>⚠️ Consignes à toujours respecter</h3><ul style="color:var(--dim);font-size:12px;line-height:1.7;margin:0;padding-left:22px"><li>Ne jamais promettre des gains d'argent garantis.</li><li>Ne jamais cibler ou t'adresser à des mineurs — ton audience doit être 18+.</li><li>Toujours garder un ton responsable autour du jeu (rappelle que c'est un divertissement).</li><li>Reste transparent sur le fait que tu es affilié/partenaire.</li></ul></div>
+ <div style="position:relative;margin-bottom:6px"><input style="padding-left:58px" placeholder="Cherche par mot-clé (ex: trafic, contenu...)" value="${esc(window._tq||'')}" oninput="window._tq=this.value;render();const e=document.querySelector('input[placeholder^=Cherche]');e.focus();e.setSelectionRange(99,99)"><span style="position:absolute;left:18px;top:16px;color:var(--ic)">${ic.search}</span></div>
+ ${Object.entries(FAQ).map(([k,l])=>{const f=l.filter(x=>!q||(x[0]+x[1]).toLowerCase().includes(q));return f.length?`<div class="sec">${k}</div>`+f.map(x=>`<details class="faq"><summary>${x[0]}</summary><p>${x[1]}</p></details>`).join(''):''}).join('')}`;
+}
+function linkList(key,ph){return S.settings[key].map((l,i)=>`<div class="row" style="margin-bottom:7px;flex-wrap:nowrap"><input placeholder="Nom" value="${esc(l.name)}" oninput="S.settings.${key}[${i}].name=this.value"><input placeholder="https://..." value="${esc(l.url)}" oninput="S.settings.${key}[${i}].url=this.value"><button class="x n" onclick="S.settings.${key}.splice(${i},1);render()">✕</button></div>`).join('')}
+function aSet(){
+ const st=S.settings;
+ return `<h1>Paramètres</h1><p class="sub">Sécurité et données de votre espace administrateur</p>
+ <div class="card"><h3>Votre lien de tracking principal</h3><p>Ce lien t'est réservé, il n'apparaît nulle part dans l'espace membre.</p><label>Lien</label><input id="s_main" placeholder="https://track.exemple.com/?ref=moi" value="${esc(st.mainLink)}"><div style="height:17px"></div><button class="btn" onclick="S.settings.mainLink=$('#s_main').value.trim();save();toast('Enregistré')">Enregistrer</button></div>
+ <div class="card"><h3>Synchronisation automatique (postbacks)</h3><p>Renseigne l'URL de ton serveur de réception des postbacks pour importer inscriptions, FTD et revenus automatiquement pour chaque sous-affilié (via son code).</p>${st.syncUrl&&st.syncKey?`<div class="pill ok" style="margin-bottom:6px">${ic.shield} Synchronisation active sur cet appareil</div>`:''}<label>URL du serveur</label><input id="s_url" placeholder="https://blue-dash-server.onrender.com" value="${esc(st.syncUrl)}"><label>Clé API</label><input id="s_key" type="password" value="${esc(st.syncKey)}" placeholder="ADMIN_API_KEY"><label>Nom du paramètre sub (dans tes liens Blue Affiliates)</label><input id="s_par" value="${esc(st.param)}"><div class="row" style="margin-top:17px"><button class="btn n" onclick="saveSync()">Enregistrer</button><button class="btn g n" onclick="syncAll()">Synchroniser maintenant</button></div></div>
+ <div class="card"><h3>Notifications Telegram</h3><p>Reçois un message Telegram quand un sous-affilié t'écrit ou demande un retrait. Crée un bot via @BotFather, puis récupère l'ID de la conversation où l'envoyer.</p><label class="chk"><input type="checkbox" id="t_on" ${st.tgOn?'checked':''}><i class="sw"></i><span>Activer les notifications Telegram</span></label><label>Token du bot</label><input id="t_tok" placeholder="123456789:AAExxxxxxxxxxxx" value="${esc(st.tgToken)}"><label>Chat ID</label><input id="t_chat" placeholder="Ex : 123456789 ou -1001234567890" value="${esc(st.tgChat)}"><div class="row" style="margin-top:17px"><button class="btn n" onclick="saveTg()">Enregistrer</button><button class="btn g n" onclick="saveTg();tg('✅ Test Blue Dash')">Envoyer un test</button></div></div>
+ <div class="card"><h3>Programme de parrainage</h3><p>Montant versé automatiquement à un sous-affilié pour chaque FTD généré par un filleul qu'il a parrainé.</p><label>Commission par FTD (€)</label><input id="s_ref" type="number" value="${st.refComm}"><div style="height:17px"></div><button class="btn" onclick="S.settings.refComm=+$('#s_ref').value||0;save();toast('Enregistré')">Enregistrer</button></div>
+ <div class="card"><h3>Liens "Communauté" (espace membre)</h3><p>Ajoute un ou plusieurs liens (Telegram, Discord...). L'onglet "Communauté" n'apparaît que s'il y a au moins un lien.</p>${st.community.length?linkList('community'):'<p>Aucun lien pour le moment, ajoute-en un.</p>'}<div class="row" style="justify-content:flex-start"><button class="btn g s n" onclick="S.settings.community.push({name:'',url:''});render()">+ Ajouter un lien</button><button class="btn s n" onclick="save();toast('Enregistré')">Enregistrer</button></div></div>
+ <div class="card"><h3>Liens "Jeux" (espace membre)</h3><p>Ajoute un ou plusieurs jeux (chacun avec son propre nom). L'onglet "Jeux" n'apparaît chez tes sous-affiliés que s'il y a au moins un lien.</p>${linkList('games')}<div class="row" style="justify-content:flex-start"><button class="btn g s n" onclick="S.settings.games.push({name:'',url:''});render()">+ Ajouter un jeu</button><button class="btn s n" onclick="save();toast('Enregistré')">Enregistrer</button></div></div>
+ <div class="card"><h3>Liens "Liens utiles" (espace membre)</h3><p>Ajoute un ou plusieurs liens (chacun avec son propre nom). Cet onglet apparaît chez tes sous-affiliés, juste en dessous de "Parrainage", uniquement s'il y a au moins un lien.</p>${st.useful.length?linkList('useful'):'<p>Aucun lien pour le moment, ajoute-en un.</p>'}<div class="row" style="justify-content:flex-start"><button class="btn g s n" onclick="S.settings.useful.push({name:'',url:''});render()">+ Ajouter un lien</button><button class="btn s n" onclick="save();toast('Enregistré')">Enregistrer</button></div></div>
+ <div class="card"><h3>Paliers de rewards</h3><p>Nombre de FTD à atteindre et montant du bonus (une fois par participant).</p>${st.tiers.map((t,i)=>`<div class="row" style="margin-bottom:7px;flex-wrap:nowrap"><input type="number" value="${t.ftd}" oninput="S.settings.tiers[${i}].ftd=+this.value" placeholder="FTD"><input type="number" value="${t.reward}" oninput="S.settings.tiers[${i}].reward=+this.value" placeholder="Bonus €"><button class="x n" onclick="S.settings.tiers.splice(${i},1);render()">✕</button></div>`).join('')}<div class="row" style="justify-content:flex-start"><button class="btn g s n" onclick="S.settings.tiers.push({ftd:0,reward:0});render()">+ Ajouter un palier</button><button class="btn s n" onclick="S.settings.tiers.sort((a,b)=>a.ftd-b.ftd);save();toast('Paliers enregistrés');render()">Enregistrer les paliers</button></div></div>
+ <div class="card"><h3>Retraits mensuels</h3><p>Chaque sous-affilié peut demander en une fois la totalité de ses gains (FTD × commission) accumulés depuis son dernier retrait. Seul le jour du mois est retenu : l'ouverture des retraits se répète chaque mois à ce même jour.</p><label>Date de référence</label><input id="s_wd" type="date" value="${new Date(2026,8,st.wDay).toISOString().slice(0,10)}"><p style="margin-top:8px">Jour d'ouverture actuel : le ${st.wDay} de chaque mois.</p><button class="btn" onclick="S.settings.wDay=new Date($('#s_wd').value).getDate()||10;save();toast('Enregistré');render()">Enregistrer</button></div>
+ <div class="card"><h3>Changer le code d'accès admin</h3><label>Code actuel</label><input id="c_old" type="password"><label>Nouveau code</label><input id="c_new" type="password"><div style="height:17px"></div><button class="btn" onclick="chCode()">Mettre à jour</button></div>
+ <div class="card"><h3>Exporter / Importer les données</h3><p>Ce site étant statique, tes données restent dans ce navigateur. Exporte-les pour les sauvegarder ou pour les transférer vers un autre appareil.</p><div class="row" style="justify-content:flex-start"><button class="btn g s n" onclick="exportData()">Exporter (.json)</button><button class="btn g s n" onclick="$('#imp').click()">Importer un fichier</button></div><input type="file" id="imp" accept=".json" style="display:none" onchange="importData(this.files[0])"></div>
+ <div class="card" style="border-color:rgba(252,165,165,.3)"><h3 style="color:var(--red)">Zone de danger</h3><p>Réinitialiser efface tous les sous-affiliés et toutes les statistiques de ce navigateur, sans retour possible.</p><button class="btn danger s" onclick="if(confirm('Tout effacer ?')){S=def();save();logout()}">Réinitialiser toutes les données</button></div>`;
+}
+function saveSync(){S.settings.syncUrl=$('#s_url').value.trim().replace(/\/$/,'');S.settings.syncKey=$('#s_key').value.trim();S.settings.param=$('#s_par').value.trim()||'sub1';save();toast('Enregistré');render()}
+function saveTg(){Object.assign(S.settings,{tgOn:$('#t_on').checked,tgToken:$('#t_tok').value.trim(),tgChat:$('#t_chat').value.trim()});save();toast('Enregistré')}
+function tg(text){const s=S.settings;if(!s.tgOn||!s.tgToken||!s.tgChat)return;fetch(`https://api.telegram.org/bot${s.tgToken}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:s.tgChat,text})}).then(()=>toast('Message Telegram envoyé')).catch(()=>toast('Échec Telegram'))}
+function chCode(){if($('#c_old').value!==S.settings.adminCode)return toast('Code actuel incorrect');if(!$('#c_new').value)return toast('Nouveau code vide');S.settings.adminCode=$('#c_new').value;save();toast('Code mis à jour')}
+function exportData(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:'application/json'}));a.download='blue-dash-'+new Date().toISOString().slice(0,10)+'.json';a.click()}
+function importData(f){if(!f)return;const r=new FileReader();r.onload=()=>{try{S=Object.assign(def(),JSON.parse(r.result));save();toast('Importé');render()}catch(e){toast('Fichier invalide')}};r.readAsText(f)}
+
+/* ============ SYNCHRO POSTBACKS (fusion: le serveur ne met à jour QUE les stats) ============ */
+async function syncAll(){
+ const {syncUrl,syncKey}=S.settings;
+ if(!syncUrl||!syncKey)return toast('Configure le serveur dans Paramètres');
+ try{
+  const r=await fetch(syncUrl+'/api/sync',{headers:{'x-api-key':syncKey}});
+  if(!r.ok)throw 0;const d=await r.json();
+  let n=0;
+  S.subs.forEach(s=>{const x=d.codes&&d.codes[s.code];if(x){s.stats={inscriptions:x.inscriptions,ftd:x.ftd,deposits:x.depositsAmount,ca:x.commission};s.events=x.events||[];n++}});
+  save();toast(`Synchronisé (${n} sous-affilié${n>1?'s':''})`);render();
+ }catch(e){toast('Échec de la synchronisation')}
+}
+
+/* ============ MEMBRE ============ */
+function memberPage(){return({home:mHome,tuto:mTuto,msg:mMsg,bal:mBal,rew:mRew,ref:mRef,tips:tips,games:mGames,comm:mComm})[page]()}
+function mHome(){
+ const s=me(),st=stat(s),conv=st.inscriptions?(st.ftd/st.inscriptions*100).toFixed(1):'0.0';
+ const links=(s.links||[]).map(l=>`<div class="inner"><small>${esc(l.name)}</small><div class="mono">${esc(withSub(l.url,s.code))}</div><button class="btn s" style="margin-top:8px" onclick="copy('${esc(withSub(l.url,s.code))}')">Copier</button></div>`).join('');
+ return `<div class="row" style="justify-content:space-between;margin-bottom:4px"><div class="pill ok n">${ic.bell} Notifications activées</div><a onclick="syncSelf()" style="color:var(--dim);cursor:pointer;font-size:13px;display:flex;gap:5px;align-items:center;justify-content:flex-end">${ic.sync} Actualiser</a></div>
+ <h1 style="font-size:26px">Bonjour, ${esc(s.name)} 👋</h1><p class="sub">Aperçu de votre activité</p>
+ ${S.announce.length?`<div class="card" style="border-color:rgba(96,165,250,.5)"><h3>📣 Annonce</h3><p style="margin:0;color:var(--tx)">${esc(S.announce[0].text)}</p></div>`:''}
+ <div class="card"><h3 style="color:var(--dim);font-size:14px">Tes liens d'affiliation</h3>${links||'<p>Aucun lien pour le moment.</p>'}</div>
+ ${s.landing?`<div class="card"><h3 style="color:var(--dim);font-size:14px">Ta landing page</h3><div class="inner"><div class="mono">${esc(s.landing)}</div><p style="margin:6px 0 12px">💡 À utiliser en priorité sur TikTok, elle convertit généralement mieux qu'un lien direct.</p><button class="btn s" onclick="copy('${esc(s.landing)}')">Copier</button></div></div>`:''}
+ <div class="stats"><div class="stat"><span>Inscriptions</span><b>${st.inscriptions}</b></div><div class="stat"><span>FTD</span><b>${st.ftd}</b></div><div class="stat"><span>Conversion</span><b>${conv}%</b></div><div class="stat"><span>Dépôts</span><b>${eur(st.deposits)}</b></div><div class="stat"><span>Mes revenus</span><b>${eur(earned(s))}</b></div><div class="stat"><span>Chiffre d'affaires</span><b>${eur(st.ca)}</b></div></div>`;
+}
+function syncSelf(){S.settings.syncUrl?syncAll():(toast('Actualisé'),render())}
+function mTuto(){
+ const s=me(),l=(s.links||[])[0],g=S.settings.games[0];
+ const st=(n,t,body)=>`<div class="card"><div class="step"><i>${n}</i><h4>${t}</h4></div>${body}</div>`;
+ return `<div style="color:var(--ic);font-weight:700;letter-spacing:.08em;font-size:13px">TUTORIEL</div><h1 style="font-size:27px">Comment générer tes premiers FTD 🔥</h1><p class="sub">Bienvenue ${esc(s.name)} — suis ces 5 étapes pour toucher tes premiers paiements.</p>
+ ${g?`<div class="card" style="display:flex;justify-content:space-between;align-items:center"><div><div style="color:var(--ic);font-weight:700;letter-spacing:.08em;font-size:11px">JEU SUGGÉRÉ</div><b style="font-size:17px">${esc(g.name)}</b></div><a class="btn g s" href="${esc(withSub(g.url,s.code))}" target="_blank">Ouvrir</a></div>`:''}
+ ${st(1,'Copie ton lien personnel',`<p>Ce lien est unique à toi. Chaque inscription et chaque FTD sont trackés automatiquement.</p>${l?`<div class="inner row" style="flex-wrap:nowrap"><div class="mono">${esc(withSub(l.url,s.code))}</div><button class="x n" onclick="copy('${esc(withSub(l.url,s.code))}')">${ic.copy}</button></div>`:''}<p>💡 Ne change jamais ce lien — toutes tes performances passées y sont attachées.</p>`)}
+ ${st(2,'Mets-le dans ta bio',`<p>TikTok/Instagram → Profil → Modifier le profil → colle ton lien dans le champ "Site web".</p><div class="note">⚠️ Sans lien en bio, aucune conversion possible — c'est le seul moyen pour les gens de cliquer.</div>`)}
+ ${st(3,'Crée du contenu',`<p>Montre l'ambiance, partage des moments marquants. Les vidéos qui marchent partagent un point commun :</p><ul style="color:var(--dim);font-size:12px;line-height:1.7"><li>3-5 premières secondes <b style="color:var(--tx)">accrocheuses</b></li><li>Format vertical, durée 15-60 secondes</li><li>Un CTA clair en fin de vidéo : « Lien en bio »</li></ul><p>Plus d'astuces détaillées dans l'onglet "Conseils & Stratégie".</p>`)}
+ ${st(4,'Poste et laisse le lien 48h minimum',`<p>🕐 Heures de pointe : 18h-23h<br>📌 Une fois posté, ne change pas ton lien en bio pendant 48h minimum.<br>🔁 La régularité fait le coup d'éclat — vise 1 publication par jour.</p>`)}
+ ${st(5,'Suis tes FTD',`<p>Dès qu'un joueur clique ton lien et dépose, ça apparaît sur ton tableau de bord (après synchronisation).</p><button class="btn g" onclick="go('home')">📊 Voir mon tableau de bord</button>`)}
+ <p style="text-align:center;color:var(--dim)">Bloqué ? Contacte-moi via l'onglet <a onclick="go('msg')" style="color:var(--tx);text-decoration:underline;cursor:pointer">Messages</a>.</p>`;
+}
+function mMsg(){const s=me(),th=S.msgs[s.id]||[];return `<h1>Messages</h1><p class="sub">Écris directement à ton parrain principal.</p><div class="card">${th.map(m=>`<div class="bub ${m.from==='m'?'me':'o'}">${esc(m.text)}</div>`).join('')||'<div class="empty">Aucun message pour le moment.</div>'}<div class="row" style="margin-top:10px;flex-wrap:nowrap"><input id="mt" placeholder="Ton message"><button class="btn n" onclick="sendMsg('${s.id}','m');tg('💬 Nouveau message de ${esc(s.name)}')">Envoyer</button></div></div>`}
+function canWithdraw(){const s=me();return s&&new Date().getDate()===S.settings.wDay&&balance(s)>0}
+function mBal(){
+ const s=me(),b=balance(s),tot=earned(s),wd=withdrawn(s.id),h=S.payments.filter(p=>p.subId===s.id&&p.type==='w');
+ return `<h1>Solde & Retraits</h1><p class="sub">Ton solde correspond à l'ensemble de tes gains (FTD × commission) non encore retirés. Les retraits s'ouvrent le ${S.settings.wDay} de chaque mois et couvrent la totalité du solde disponible.</p>
+ <div class="stats"><div class="stat" style="min-height:130px"><span style="text-transform:none;letter-spacing:0;font-size:13px;font-weight:500">Solde disponible</span><b>${eur(b)}</b></div><div class="stat"><span style="text-transform:none;letter-spacing:0;font-size:13px;font-weight:500">Total gagné à ce jour</span><b>${eur(tot)}</b><p style="margin:6px 0 0;color:var(--dim);font-size:12px">dont ${eur(wd)} déjà demandés/retirés</p></div></div>
+ <div class="card"><button class="btn" onclick="askWd()">${ic.wallet.replace(/width="28" height="28"/,'width="22" height="22"')} Demander mon retrait — ${eur(b)}</button>${canWithdraw()?'':`<p style="margin:10px 0 0">Prochaine ouverture : le ${S.settings.wDay} du mois.</p>`}</div>
+ <div class="sec" style="font-weight:700">Historique des retraits</div>${h.map(p=>`<div class="card"><b style="font-size:17px">${eur(p.amount)}</b><p style="margin:6px 0 12px">Demandé le ${fmtD(p.date)} · 🏦 Virement bancaire</p><span class="pill ${p.status==='paid'?'ok':'b'} s">${p.status==='paid'?'Payé le '+fmtD(p.paidAt):'En attente'}</span></div>`).join('')||'<div class="empty">Aucun retrait.</div>'}`;
+}
+function askWd(){const s=me(),b=balance(s);if(!canWithdraw())return toast(`Retraits ouverts le ${S.settings.wDay} du mois`);const d=prompt('Tes coordonnées de paiement (IBAN / crypto) :');if(!d)return;S.payments.push({id:uid(),subId:s.id,type:'w',amount:b,date:Date.now(),details:d,status:'pending'});save();tg(`💸 Demande de retrait ${eur(b)} — ${s.name}`);toast('Demande envoyée');render()}
+function mRew(){
+ const s=me(),f=stat(s).ftd,cl=S.rewardsClaimed[s.id]||[];
+ return `<h1>Rewards</h1><p class="sub">Consultez les bonus disponibles et débloquez-les en cumulant des premiers dépôts (FTD).</p><div class="card" style="display:flex;justify-content:space-between;align-items:center;padding:15px"><span style="color:var(--dim);font-size:13px">Ton total de FTD confirmés</span><b style="font-size:24px">${f}</b></div>
+ ${S.settings.tiers.map((t,i)=>{const ok=f>=t.ftd,done=cl.includes(t.ftd);return `<div class="card"><div class="row" style="flex-wrap:nowrap;gap:10px;align-items:flex-start"><div class="n" style="width:40px;height:55px;border-radius:14px;border:1px solid rgba(96,165,250,.4);display:grid;place-items:center;color:var(--ic);background:rgba(59,130,246,.08)">${i===0?ic.shield:ic.gift}</div><div><h3 style="margin:0 0 6px;font-size:17px">Bonus ${t.ftd} FTD</h3><p style="margin:0">Atteindre ${t.ftd} premiers dépôts pour remporter ce reward. Une fois par participant.</p></div></div><div style="margin:13px 0 14px"><span class="pill ${ok?'ok':'b'} s">+${eur(t.reward)}</span></div><div class="bar"><i style="width:${Math.min(100,f/t.ftd*100)}%"></i></div><div class="row" style="margin-top:7px;justify-content:space-between;color:var(--dim);font-size:12px"><span>${ok?'Débloqué ✔':'Progression'}</span><span style="text-align:right">${Math.min(f,t.ftd)} / ${t.ftd}</span></div>${ok&&!done?`<button class="btn" style="margin-top:11px" onclick="claimRew(${t.ftd})">${ic.wallet.replace(/width="28" height="28"/,'width="22" height="22"')} Demander mon reward</button>`:''}${done?'<p style="margin:10px 0 0;color:var(--grn)">Reward déjà demandé ✔</p>':''}</div>`}).join('')}`;
+}
+function claimRew(ftd){const s=me(),t=S.settings.tiers.find(x=>x.ftd===ftd);const d=prompt('Tes coordonnées de paiement (IBAN / crypto) :');if(!d)return;(S.rewardsClaimed[s.id]=S.rewardsClaimed[s.id]||[]).push(ftd);S.payments.push({id:uid(),subId:s.id,type:'r',label:'Bonus '+ftd+' FTD',amount:t.reward,date:Date.now(),details:d,status:'pending'});save();tg(`🎁 Reward ${t.reward}€ demandé — ${s.name}`);toast('Demande envoyée');render()}
+function mRef(){
+ const s=me(),url=location.href.split('?')[0]+'?ref='+encodeURIComponent(s.code),fil=S.subs.filter(x=>x.referrer===s.id);
+ const msg=`Rejoins-moi sur Blue Dash : ${url}`;
+ return `<h1>Parrainage</h1><p class="sub">Parraine d'autres affiliés et gagne ${eur(S.settings.refComm)} pour chaque FTD qu'ils génèrent.</p>
+ <div class="card"><h3>Ton lien de parrainage</h3><div class="inner"><div class="mono">${esc(url)}</div></div><div class="row" style="justify-content:flex-start;margin-bottom:8px"><button class="btn g s n" onclick="copy('${esc(url)}')">${ic.copy} Copier le lien</button></div><div class="row" style="justify-content:flex-start"><a class="btn g s n" target="_blank" href="https://wa.me/?text=${encodeURIComponent(msg)}">${ic.send} WhatsApp</a><a class="btn g s n" target="_blank" href="https://t.me/share/url?url=${encodeURIComponent(url)}">${ic.send} Telegram</a><a class="btn g s n" target="_blank" href="https://twitter.com/intent/tweet?text=${encodeURIComponent(msg)}">${ic.send} X</a><button class="btn g s n" onclick="copy('${esc(msg)}')">${ic.copy} Copier le message</button></div></div>
+ <div class="stats"><div class="stat"><span>Filleuls</span><b>${fil.length}</b></div><div class="stat"><span>Revenus de parrainage</span><b>${eur(fil.reduce((a,f)=>a+stat(f).ftd*S.settings.refComm,0))}</b></div></div>
+ <div class="card tw"><h3 style="padding:14px 24px 0">Mes filleuls</h3><table><tr><th>Nom</th><th>Depuis le</th><th>Statut</th><th>FTD générés</th></tr>${fil.map(f=>`<tr><td>${esc(f.name)}</td><td>${fmtD(f.created)}</td><td>${stat(f).ftd?'Actif':'Inscrit'}</td><td>${stat(f).ftd}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">Tu n\'as encore parrainé personne.</td></tr>'}</table></div>
+ <div class="card tw"><h3 style="padding:14px 24px 0">Historique des commissions de parrainage</h3><table><tr><th>Date</th><th>Filleul</th><th>FTD</th><th>Montant</th></tr><tr><td colspan="4" class="empty">Aucune commission de parrainage pour le moment.</td></tr></table></div>`;
+}
+function mGames(){const s=me();return `<h1>Jeux</h1><p class="sub">Lance un jeu depuis ici.</p>${S.settings.games.filter(g=>g.url).map(g=>`<a class="game" target="_blank" href="${esc(withSub(g.url,s.code))}"><span class="gi">${ic.play}</span><span>${esc(g.name)}</span><span class="s">${ic.send}</span></a>`).join('')||'<div class="empty">Aucun jeu disponible.</div>'}`}
+function mComm(){return `<h1>Communauté</h1><p class="sub">Rejoins la communauté et les liens utiles.</p>${[...S.settings.community,...S.settings.useful].filter(g=>g.url).map(g=>`<a class="game" target="_blank" href="${esc(g.url)}"><span class="gi">${ic.users}</span><span>${esc(g.name)}</span><span class="s">${ic.send}</span></a>`).join('')||'<div class="empty">Aucun lien pour le moment.</div>'}`}
+
+/* ============ DÉMARRAGE ============ */
+if(session&&session.role==='m'&&!S.settings.games.length&&page==='games')page='home';
+render();
+</script>
+</body>
+</html>
