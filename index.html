@@ -179,7 +179,7 @@ const uid=()=>Math.random().toString(36).slice(2,10);
 const def=()=>({
  settings:{mainLink:'',tgOn:false,tgToken:'',tgChat:'',refComm:5,
   tiers:[{ftd:10,reward:50},{ftd:100,reward:500},{ftd:500,reward:1000},{ftd:1000,reward:2000},{ftd:2000,reward:4000}],
-  wDay:10,param:'sub1',linkParam:'s1',games:[],useful:[],community:[]},
+  wDay:10,param:'sub1',linkParam:'s1',signupOn:true,signupApprove:true,signupComm:30,signupLinks:[],games:[],useful:[],community:[]},
  subs:[],payments:[],msgs:{},rewardsClaimed:{},announce:[]
 });
 let S=def();
@@ -194,17 +194,18 @@ async function api(path,method='GET',body){
  if(!r.ok)throw new Error((d&&d.error)||'Erreur serveur');
  return d;
 }
-function applyState(d){S=Object.assign(def(),d,{settings:Object.assign(def().settings,d.settings)})}
+let SEEN=[];
+function applyState(d){S=Object.assign(def(),d,{settings:Object.assign(def().settings,d.settings)});if(auth&&auth.role==='a'&&Array.isArray(d.subs))SEEN=d.subs.map(x=>x.id)}
 async function loadState(){applyState(await api('/api/state'));if(auth&&auth.role==='m'&&S.subs[0]&&session)session.id=S.subs[0].id;ready=true}
 function save(){if(!auth||auth.role!=='a')return;clearTimeout(saveT);saveT=setTimeout(pushConfig,250)}
-async function pushConfig(){try{await api('/api/config','PUT',{settings:S.settings,subs:S.subs.map(x=>({id:x.id,name:x.name,code:x.code,links:x.links,commission:x.commission,landing:x.landing,referrer:x.referrer,created:x.created})),announce:S.announce})}catch(e){toast(e.message)}}
-const sigOf=()=>JSON.stringify([S.payments,S.msgs,S.rewardsClaimed,S.announce,S.subs.map(x=>[x.id,x.stats,(x.events||[]).length])]);
+async function pushConfig(){try{await api('/api/config','PUT',{settings:S.settings,subs:S.subs.map(x=>({id:x.id,name:x.name,code:x.code,links:x.links,commission:x.commission,landing:x.landing,referrer:x.referrer,created:x.created,newPass:x.newPass})),seen:SEEN,announce:S.announce});S.subs.forEach(x=>{delete x.newPass})}catch(e){toast(e.message)}}
+const sigOf=()=>JSON.stringify([S.pending,S.pb,S.payments,S.msgs,S.rewardsClaimed,S.announce,S.subs.map(x=>[x.id,x.stats,(x.events||[]).length])]);
 const safeToRender=()=>{const a=document.activeElement;return !(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName))&&!drawer&&(editing===null||page==='msg')};
 async function refresh(silent){
  if(!auth)return;
  try{
   const d=await api('/api/state');
-  if(auth.role==='a'){S.payments=d.payments;S.msgs=d.msgs;S.rewardsClaimed=d.rewardsClaimed;d.subs.forEach(n=>{const o=S.subs.find(x=>x.id===n.id);if(o){o.stats=n.stats;o.events=n.events}})}
+  if(auth.role==='a'){S.pb=d.pb;S.payments=d.payments;S.msgs=d.msgs;S.rewardsClaimed=d.rewardsClaimed;d.subs.forEach(n=>{const o=S.subs.find(x=>x.id===n.id);if(o){o.stats=n.stats;o.events=n.events}else S.subs.push(n)});SEEN=d.subs.map(x=>x.id);S.pending=d.pending||[]}
   else applyState(d);
   const sg=sigOf();
   if(!silent||(sg!==lastSig&&safeToRender()))render();
@@ -254,8 +255,8 @@ const ic={
 const NAV_A=[['home','Vue d\'ensemble','grid'],['subs','Sous-affiliés','users'],['pay','Paiements','wallet'],['msg','Messages','chat'],['ref','Parrainages','gift'],['tips','Conseils & Stratégie','bulb'],['set','Paramètres','gear']];
 const NAV_M=[['home','Mon tableau de bord','grid'],['tuto','Tutoriel','book'],['msg','Messages','chat'],['bal','Solde & Retraits','wallet'],['rew','Rewards','gift'],['ref','Parrainage','gift'],['tips','Conseils & Stratégie','bulb'],['games','Jeux','play'],['comm','Communauté','users']];
 function go(p){page=p;drawer=false;editing=null;render();window.scrollTo(0,0)}
-async function startSession(){localStorage.setItem(AUTH_KEY,JSON.stringify(auth));session={role:auth.role,id:auth.id};page='home';ready=false;lastSig='';render();try{await loadState();lastSig=sigOf();render();clearInterval(poll);poll=setInterval(()=>refresh(true),15000)}catch(e){toast(e.message);logout()}}
-function logout(){clearInterval(poll);auth=null;session=null;ready=false;S=def();localStorage.removeItem(AUTH_KEY);drawer=false;render()}
+async function startSession(){localStorage.setItem(AUTH_KEY,JSON.stringify(auth));session={role:auth.role,id:auth.id};page='home';ready=false;lastSig='';render();try{await loadState();if(INIT_PAGE){if((auth.role==='a'?NAV_A:NAV_M).some(n=>n[0]===INIT_PAGE))page=INIT_PAGE;INIT_PAGE='';history.replaceState(null,'',location.pathname)}lastSig=sigOf();render();pushCheck();clearInterval(poll);poll=setInterval(()=>refresh(true),15000)}catch(e){toast(e.message);logout()}}
+function logout(){clearInterval(poll);PUSH={st:'chk'};auth=null;session=null;ready=false;S=def();localStorage.removeItem(AUTH_KEY);drawer=false;render()}
 
 /* ============ RENDU ============ */
 function render(){
@@ -267,9 +268,9 @@ function render(){
  const adm=session.role==='a';
  if(!adm&&!me()){logout();return}
  const nav=adm?NAV_A:NAV_M;
- const badge=k=>!adm&&k==='bal'&&canWithdraw()?`<span class="badge">!</span>`:'';
+ const badge=k=>adm&&k==='subs'&&(S.pending||[]).some(p=>p.status==='pending')?`<span class="badge">${(S.pending||[]).filter(p=>p.status==='pending').length}</span>`:(!adm&&k==='bal'&&canWithdraw()?`<span class="badge">!</span>`:'');
  app.innerHTML=`<header><b class="bl">${brandHtml()}</b><button class="burger" onclick="drawer=!drawer;render()">${ic.menu}</button></header>
- <div class="drawer ${drawer?'on':''}">${nav.map(n=>`<a class="${page===n[0]?'on':''}" onclick="go('${n[0]}')">${ic[n[2]]}<span>${n[1]}</span>${badge(n[0])}</a>`).join('')}<a onclick="logout()">${ic.out}<span>Déconnexion</span></a></div>
+ <div class="drawer ${drawer?'on':''}">${nav.map(n=>`<a class="${page===n[0]?'on':''}" onclick="go('${n[0]}')">${ic[n[2]]}<span>${n[1]}</span>${badge(n[0])}</a>`).join('')}${isStandalone()?'':`<a onclick="installApp()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v3h16v-3"/></svg><span>Installer l'application</span></a>`}<a onclick="userLogout()">${ic.out}<span>Déconnexion</span></a></div>
  <main>${adm?adminPage():memberPage()}</main>`;
  requestAnimationFrame(animateStats);
 }
@@ -288,14 +289,37 @@ function animateStats(){
  });
 }
 function loginView(){
- const T={m:'Espace membre',a:'Espace admin'};
+ const T={m:'Connexion'};if(BR.signupOn!==false)T.s='Inscription';T.a='Admin';if(tab==='s'&&BR.signupOn===false)tab='m';
  let f='';
- if(tab==='m')f=`<label>Nom</label><input id="ln" placeholder="Votre nom"><label>Code d'accès</label><input id="lc" type="password" placeholder="Votre code"><div style="height:17px"></div><button class="btn block" onclick="doLogin()">Se connecter</button>`;
+ if(tab==='m')f=`<label>Nom</label><input id="ln" placeholder="Votre nom"><label>Mot de passe</label><input id="lc" type="password" placeholder="Mot de passe ou code d'accès"><div style="height:17px"></div><button class="btn block" onclick="doLogin()">Se connecter</button>`;
  if(tab==='a')f=`<label>Code admin</label><input id="ac" type="password" placeholder="Code d'accès admin"><div style="height:17px"></div><button class="btn block" onclick="doAdmin()">Se connecter</button>`;
- return `<div class="login"><h2 class="bl">${brandHtml()}</h2><div class="card" style="padding:14px"><div class="tabs">${Object.keys(T).map(k=>`<button class="${tab===k?'on':''}" onclick="tab='${k}';render()">${T[k]}</button>`).join('')}</div><div style="padding:0 10px 10px">${f}</div></div><p style="text-align:center;color:#6b6b73;font-size:12px;padding:0 20px">Tes données sont synchronisées sur tous tes appareils.</p></div>`;
+ if(tab==='s')f=`<label>Nom</label><input id="sn" placeholder="Choisis ton nom" autocomplete="username"><label>Mot de passe</label><input id="sp" type="password" placeholder="6 caractères minimum" autocomplete="new-password"><label>Confirmer le mot de passe</label><input id="sp2" type="password" placeholder="Répète le mot de passe" autocomplete="new-password"><label>Code de parrainage (optionnel)</label><input id="srf" placeholder="Ex : 3638E4AD76" value="${esc(REF.toUpperCase())}" autocapitalize="characters" autocomplete="off" onchange="lookupRef(this.value)"><p id="rfn" style="margin:6px 0 0;text-align:center">${refName?`Parrainé par <b>${esc(refName)}</b>`:''}</p><div style="height:17px"></div><button class="btn block" onclick="doSignup()">Créer mon compte</button>`;
+ const note=loginNote?`<div class="note" style="margin:2px 0 12px;text-align:center">${esc(loginNote)}</div>`:'';
+ return `<div class="login"><h2 class="bl">${brandHtml()}</h2><div class="card" style="padding:14px"><div class="tabs">${Object.keys(T).map(k=>`<button class="${tab===k?'on':''}" onclick="tab='${k}';render()">${T[k]}</button>`).join('')}</div><div style="padding:0 10px 10px">${note}${f}</div></div>${installBtn()}<p style="text-align:center;color:#6b6b73;font-size:12px;padding:0 20px">Tes données sont synchronisées sur tous tes appareils.</p></div>`;
 }
 async function loginReq(body){const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Identifiants incorrects');return d}
-async function doLogin(){const n=$('#ln').value.trim(),c=$('#lc').value.trim();if(!n||!c)return toast('Nom et code requis');try{const d=await loginReq({role:'m',name:n,code:c});auth={role:'m',name:n,code:c,id:d.id};startSession()}catch(e){toast(e.message==='Failed to fetch'?'Serveur injoignable':e.message)}}
+async function doLogin(){const n=$('#ln').value.trim(),c=$('#lc').value.trim();if(!n||!c)return toast('Nom et code requis');try{const d=await loginReq({role:'m',name:n,code:c});auth={role:'m',name:n,code:c,id:d.id};loginNote='';startSession()}catch(e){if(/attente/.test(e.message)){loginNote=e.message;render()}else toast(e.message==='Failed to fetch'?'Serveur injoignable':e.message)}}
+let refName='',loginNote='';const REF=new URLSearchParams(location.search).get('ref')||'';
+if(REF&&!auth&&BR.signupOn!==false)tab='s';
+if(REF)fetch('/api/ref/'+encodeURIComponent(REF)).then(r=>r.ok?r.json():null).then(d=>{if(d&&d.name){refName=d.name;if(!auth)render()}}).catch(()=>{});
+async function signupAct(id,act){try{if(act==='delete'&&!confirm('Supprimer cette inscription ?'))return;await api('/api/signup/'+id+(act==='delete'?'':'/'+act),act==='delete'?'DELETE':'POST',act==='delete'?undefined:{});await refresh(false);toast(act==='accept'?'Compte accepté ✅ Pense à lui ajouter son lien':act==='refuse'?'Inscription refusée':'Supprimé')}catch(e){toast(e.message)}}
+async function lookupRef(v){const el=$('#rfn');if(!el)return;v=(v||'').trim();if(!v){el.innerHTML='';return}try{const r=await fetch('/api/ref/'+encodeURIComponent(v));const d=r.ok?await r.json():null;el.innerHTML=d&&d.name?'Parrainé par <b>'+esc(d.name)+'</b>':'<span style="color:#f87171">Code de parrainage introuvable</span>'}catch(e){}}
+async function doSignup(){const n=$('#sn').value.trim(),p=$('#sp').value,p2=$('#sp2').value;
+ if(n.length<2)return toast('Nom trop court');if(p.length<6)return toast('Mot de passe : 6 caractères min.');if(p!==p2)return toast('Les mots de passe ne correspondent pas');
+ try{const r=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n,pass:p,ref:$('#srf').value.trim()})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Inscription impossible');
+ if(d.pending){loginNote='✅ Inscription envoyée ! Ton compte doit être validé par l\'admin. Reviens un peu plus tard pour te connecter.';tab='m';history.replaceState(null,'',location.pathname);render();return}
+ const l=await loginReq({role:'m',name:n,code:p});auth={role:'m',name:n,code:p,id:l.id};history.replaceState(null,'',location.pathname);startSession();toast('Compte créé 🎉')}catch(e){toast(e.message==='Failed to fetch'?'Serveur injoignable':e.message)}}
+function shareRef(){const s=me();navigator.share({title:brand(),text:'Rejoins-moi sur '+brand(),url:location.origin+'/?ref='+encodeURIComponent(s.id)}).catch(()=>{})}
+function saveSignup(){const s=S.settings;s.signupOn=$('#su_on').checked;s.signupApprove=$('#su_ap').checked;s.signupComm=+$('#su_comm').value||0;save();toast('Enregistré')}
+let _ip=null;addEventListener('beforeinstallprompt',e=>{e.preventDefault();_ip=e});addEventListener('appinstalled',()=>{_ip=null;toast('Application installée ✅')});
+const isStandalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+async function installApp(){
+ if(_ip){_ip.prompt();try{await _ip.userChoice}catch(e){}_ip=null;return}
+ if(isIOS())return alert("Sur iPhone / iPad : ouvre le site dans Safari, touche le bouton Partager (carré avec une flèche), puis « Sur l'écran d'accueil ».");
+ alert("Dans le menu de ton navigateur, choisis « Installer l'application » ou « Ajouter à l'écran d'accueil ».")}
+const installBtn=()=>isStandalone()?'':`<div style="display:flex;justify-content:center;margin:0 auto 14px"><button class="btn g s n" style="display:inline-flex;align-items:center;gap:8px" onclick="installApp()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v3h16v-3"/></svg>Installer l'application</button></div>`;
+if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
 async function doAdmin(){const c=$('#ac').value;if(!c)return toast('Code requis');try{await loginReq({role:'a',code:c});auth={role:'a',code:c};startSession()}catch(e){toast(e.message==='Failed to fetch'?'Serveur injoignable':e.message)}}
 
 /* ============ ADMIN ============ */
@@ -305,7 +329,7 @@ function aHome(){
  const ca=S.subs.reduce((a,s)=>a+stat(s).ca,0);
  const due=S.subs.reduce((a,s)=>a+balance(s),0);
  return `${S.defaultCode?'<div class="card warn"><h3>⚠️ Change ton code admin</h3><p>Tu utilises encore le code par défaut. Va dans Paramètres → « Changer le code d\'accès admin ».</p></div>':''}<h1>Vue d'ensemble</h1><p class="sub">Performance globale de votre réseau de sous-affiliés</p>
- <div class="pill ok" style="margin-bottom:15px">${ic.bell} Notifications activées</div>
+ ${pushCard()}
  <div class="stats"><div class="stat"><span>Sous-affiliés</span><b>${n}</b></div><div class="stat"><span>Actifs</span><b>${act}</b></div><div class="stat"><span>Revenus générés</span><b>${eur(ca)}</b></div><div class="stat"><span>Commissions à payer</span><b>${eur(due)}</b></div></div>
  <div class="card"><h3 style="font-size:19px">Revenus dans le temps</h3><p style="margin-bottom:11px">Tous sous-affiliés confondus</p><div class="seg">${[['j','Jour'],['s','Semaine'],['m','Mois']].map(x=>`<button class="${chartMode===x[0]?'on':''}" onclick="chartMode='${x[0]}';render()">${x[1]}</button>`).join('')}</div><div style="margin-top:14px">${chart()}</div></div>`;
 }
@@ -323,7 +347,9 @@ function aSubs(){
  if(editing!==null)return subForm();
  const q=(window._q||'').toLowerCase();
  const list=S.subs.filter(s=>!q||s.name.toLowerCase().includes(q)||s.code.toLowerCase().includes(q));
- return `<h1>Sous-affiliés</h1><p class="sub">${S.subs.length} au total</p>
+ const pend=S.pending||[];
+ const pendCard=pend.length?`<div class="card"><h3>Inscriptions à valider (${pend.filter(p=>p.status==='pending').length})</h3>${pend.map(p=>`<div class="inner row" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><div><b>${esc(p.name)}</b>${p.status==='refused'?' <span class="pill">Refusé</span>':''}<br><small>${fmtD(p.created)}${p.parent?' · parrain : '+esc(p.parent):''}</small></div><div class="row" style="gap:8px"><button class="btn s n" onclick="signupAct('${p.id}','accept')">Accepter</button>${p.status==='refused'?`<button class="btn danger s n" onclick="signupAct('${p.id}','delete')">Supprimer</button>`:`<button class="btn g s n" onclick="signupAct('${p.id}','refuse')">Refuser</button>`}</div></div>`).join('')}</div>`:'';
+ return `<h1>Sous-affiliés</h1><p class="sub">${S.subs.length} au total</p>${pendCard}
  <div class="row" style="margin-bottom:14px"><button class="btn g" onclick="syncAll()">${ic.sync} Tout synchroniser</button><button class="btn" onclick="editing='new';render()">+ Nouveau sous-affilié</button></div>
  <div style="position:relative;margin-bottom:13px"><input id="q" style="padding-left:58px" placeholder="Rechercher par nom ou code..." value="${esc(window._q||'')}" oninput="window._q=this.value;render();const e=$('#q');e.focus();e.setSelectionRange(99,99)"><span style="position:absolute;left:18px;top:16px;color:var(--ic)">${ic.search}</span></div>
  <div class="card tw"><table><tr><th>Nom</th><th>Code</th><th>Commission</th><th>Revenu</th></tr>${list.map(s=>`<tr class="click" onclick="editing='${s.id}';render()"><td><b>${esc(s.name)}</b></td><td><span class="code">${esc(s.code)}</span></td><td>${eur(s.commission)}/FTD</td><td class="blue">${eur(earned(s))}</td></tr>`).join('')||`<tr><td colspan="4" class="empty">Aucun sous-affilié</td></tr>`}</table></div>`;
@@ -334,7 +360,8 @@ function subForm(){
  if(!window._fl||window._fe!==editing){window._fl=(s.links||[]).map(l=>({...l}));window._fe=editing}
  return `<h1>${editing==='new'?'Nouveau sous-affilié':esc(s.name)}</h1><p class="sub"></p><div class="card">
  <label>Nom</label><input id="fn" placeholder="Ex : Jordan M." value="${esc(s.name)}">
- <label>Code d'accès</label><div class="row"><input id="fc" placeholder="Ex : X7K2M9" value="${esc(s.code)}"><button class="btn g n" onclick="$('#fc').value=Math.random().toString(36).slice(2,8).toUpperCase()">Générer</button></div>
+ <label>Code d'accès / code de tracking</label><div class="row"><input id="fc" placeholder="Ex : X7K2M9" value="${esc(s.code)}"><button class="btn g n" onclick="$('#fc').value=Math.random().toString(36).slice(2,8).toUpperCase()">Générer</button></div>
+ <label>Mot de passe de connexion (optionnel, 6 caractères min.)</label><input id="fnp" type="text" autocomplete="off" placeholder="${s.hasPass?'Laisser vide pour ne pas changer':'Si vide, le code ci-dessus sert de mot de passe'}">${s.selfReg?'<p style="margin-top:7px">Compte créé via l\'inscription : le code ci-dessus ne sert qu\'au suivi des liens.</p>':''}
  <p style="margin-top:13px">Liens de base (n'importe quel casino/site, optionnel — tu peux les ajouter plus tard)</p>
  ${window._fl.map((l,i)=>`<div class="row" style="margin-bottom:7px;flex-wrap:nowrap"><input placeholder="Nom" value="${esc(l.name)}" oninput="_fl[${i}].name=this.value" style="flex:1"><input placeholder="https://votre-casino.com/..." value="${esc(l.url)}" oninput="_fl[${i}].url=this.value" style="flex:1.3"><button class="x n" onclick="_fl.splice(${i},1);render()">✕</button></div>`).join('')}
  <button class="btn g s" onclick="_fl.push({name:'',url:''});render()">+ Ajouter un lien</button>
@@ -347,9 +374,9 @@ function subForm(){
  ${editing!=='new'?`<div class="row" style="margin-top:10px"><button class="btn g s" onclick="copy(location.href.split('?')[0])">Copier le lien du dash</button><button class="btn danger s" onclick="delSub()">Supprimer</button></div>`:''}</div>`;
 }
 function saveSub(){
- const name=$('#fn').value.trim(),code=$('#fc').value.trim();if(!name||!code)return toast('Nom et code requis');
+ const name=$('#fn').value.trim(),code=$('#fc').value.trim(),np=$('#fnp').value.trim();if(!name||!code)return toast('Nom et code requis');if(np&&np.length<6)return toast('Mot de passe : 6 caractères min.');
  if(S.subs.some(x=>x.code===code&&x.id!==editing))return toast('Ce code existe déjà');
- const d={name,code,links:_fl.filter(l=>l.url),commission:+$('#fm').value||0,landing:$('#fl').value.trim(),referrer:$('#fr').value};
+ const d={name,code,links:_fl.filter(l=>l.url),commission:+$('#fm').value||0,landing:$('#fl').value.trim(),referrer:$('#fr').value,...(np?{newPass:np}:{})};
  if(editing==='new')S.subs.push({id:uid(),stats:{},events:[],created:Date.now(),...d});else Object.assign(S.subs.find(x=>x.id===editing),d);
  save();editing=null;window._fe=null;toast('Enregistré');render();
 }
@@ -402,9 +429,10 @@ function aSet(){
  <div class="row"><div><label>Paramètre « commission »</label><input id="n_commission" value="${esc((st.map||{}).commission)}"></div><div><label>Paramètre « id transaction »</label><input id="n_tx" value="${esc((st.map||{}).tx)}"></div></div>
  <div class="row"><div><label>Événement : inscription</label><input id="n_reg" value="${esc((st.map||{}).reg)}"></div><div><label>Événement : 1er dépôt (FTD)</label><input id="n_ftd" value="${esc((st.map||{}).ftd)}"></div></div>
  <div class="row"><div><label>Événement : dépôt</label><input id="n_dep" value="${esc((st.map||{}).dep)}"></div><div><label>Événement : commission</label><input id="n_com" value="${esc((st.map||{}).com)}"></div></div>
- <label>Secret HMAC Blue Affiliates (pour vérifier {sig})</label><input id="n_secret" type="password" autocomplete="off" placeholder="Colle ici le secret de ton compte Blue Affiliates" value="${esc(st.baSecret||'')}"><p style="margin:8px 0 0">${(S.pb&&S.pb.last)?'✅ Dernier postback reçu : '+new Date(S.pb.last).toLocaleString('fr-FR')+' ('+S.pb.count+' événements)':'⏳ Aucun postback reçu pour le moment.'}</p><div class="row"><div><label>Symbole macro gauche</label><input id="n_l" value="${esc(st.macroL)}"></div><div><label>Symbole macro droit</label><input id="n_r" value="${esc(st.macroR)}"></div></div>
+ <label>Secret HMAC Blue Affiliates (pour vérifier {sig})</label><input id="n_secret" type="password" autocomplete="off" placeholder="Colle ici le secret de ton compte Blue Affiliates" value="${esc(st.baSecret||'')}"><p style="margin:8px 0 0">${(S.pb&&S.pb.last)?'✅ Dernier postback reçu : '+new Date(S.pb.last).toLocaleString('fr-FR')+' ('+S.pb.count+' événements)':'⏳ Aucun postback reçu pour le moment.'}</p><div class="row" style="margin-top:12px"><button class="btn s n" onclick="pbTest()">Envoyer un postback test</button><button class="btn g s n" onclick="pbTestClear()">Effacer les tests</button></div><div class="row"><div><label>Symbole macro gauche</label><input id="n_l" value="${esc(st.macroL)}"></div><div><label>Symbole macro droit</label><input id="n_r" value="${esc(st.macroR)}"></div></div>
  <div style="height:17px"></div><button class="btn" onclick="saveNetwork()">Enregistrer</button></div>
  <div class="card"><h3>Notifications Telegram</h3><p>Reçois un message Telegram quand un sous-affilié t'écrit ou demande un retrait. Crée un bot via @BotFather, puis récupère l'ID de la conversation où l'envoyer.</p><label class="chk"><input type="checkbox" id="t_on" ${st.tgOn?'checked':''}><i class="sw"></i><span>Activer les notifications Telegram</span></label><label>Token du bot</label><input id="t_tok" placeholder="123456789:AAExxxxxxxxxxxx" value="${esc(st.tgToken)}"><label>Chat ID</label><input id="t_chat" placeholder="Ex : 123456789 ou -1001234567890" value="${esc(st.tgChat)}"><div class="row" style="margin-top:17px"><button class="btn n" onclick="saveTg()">Enregistrer</button><button class="btn g n" onclick="testTg()">Envoyer un test</button></div></div>
+ <div class="card"><h3>Inscriptions &amp; liens de parrainage</h3><p>Tes sous-affiliés peuvent créer eux-mêmes leur compte depuis l'onglet « Inscription » de la page de connexion. Chaque membre a un lien de parrainage personnel : la personne qui s'inscrit avec ce lien est rattachée à lui automatiquement.</p><label class="chk"><input type="checkbox" id="su_on" ${st.signupOn!==false?'checked':''}><i class="sw"></i><span>Autoriser les inscriptions</span></label><label class="chk"><input type="checkbox" id="su_ap" ${st.signupApprove!==false?'checked':''}><i class="sw"></i><span>Valider manuellement chaque inscription</span></label><label>Commission par FTD des nouveaux inscrits (€)</label><input id="su_comm" type="number" value="${st.signupComm}"><p style="margin-top:12px">Liens donnés automatiquement aux nouveaux inscrits (nom + lien S2S de ton réseau) :</p>${linkList('signupLinks')}<div class="row" style="justify-content:flex-start"><button class="btn g s n" onclick="S.settings.signupLinks.push({name:'',url:''});render()">+ Ajouter un lien</button><button class="btn s n" onclick="saveSignup()">Enregistrer</button></div><p style="margin-top:10px">Lien d'inscription : <b>${esc(location.origin)}/</b></p><button class="btn g s n" onclick="copy(location.origin+'/')">Copier le lien d'inscription</button></div>
  <div class="card"><h3>Programme de parrainage</h3><p>Montant versé automatiquement à un sous-affilié pour chaque FTD généré par un filleul qu'il a parrainé.</p><label>Commission par FTD (€)</label><input id="s_ref" type="number" value="${st.refComm}"><div style="height:17px"></div><button class="btn" onclick="S.settings.refComm=+$('#s_ref').value||0;save();toast('Enregistré')">Enregistrer</button></div>
  <div class="card"><h3>Liens "Communauté" (espace membre)</h3><p>Ajoute un ou plusieurs liens (Telegram, Discord...). L'onglet "Communauté" n'apparaît que s'il y a au moins un lien.</p>${st.community.length?linkList('community'):'<p>Aucun lien pour le moment, ajoute-en un.</p>'}<div class="row" style="justify-content:flex-start"><button class="btn g s n" onclick="S.settings.community.push({name:'',url:''});render()">+ Ajouter un lien</button><button class="btn s n" onclick="save();toast('Enregistré')">Enregistrer</button></div></div>
  <div class="card"><h3>Liens "Jeux" (espace membre)</h3><p>Ajoute un ou plusieurs jeux (chacun avec son propre nom). L'onglet "Jeux" n'apparaît chez tes sous-affiliés que s'il y a au moins un lien.</p>${linkList('games')}<div class="row" style="justify-content:flex-start"><button class="btn g s n" onclick="S.settings.games.push({name:'',url:''});render()">+ Ajouter un jeu</button><button class="btn s n" onclick="save();toast('Enregistré')">Enregistrer</button></div></div>
@@ -416,6 +444,8 @@ function aSet(){
  <div class="card" style="border-color:rgba(252,165,165,.3)"><h3 style="color:var(--red)">Zone de danger</h3><p>Réinitialiser efface tous les sous-affiliés et toutes les statistiques de ce navigateur, sans retour possible.</p><button class="btn danger s" onclick="resetAll()">Réinitialiser toutes les données</button></div>`;
 }
 function saveBrand(){const s=S.settings;s.brand=$('#b_name').value.trim()||'AFFIX';s.colorA=$('#b_a').value;s.colorB=$('#b_b').value;s.logo=$('#b_logo').value.trim();save();applyBrand();toast('Enregistré');render()}
+async function pbTest(){try{await pushConfig();const r=await api('/api/pb-test','POST',{});await refresh();toast(r.ok?'✅ Postback test reçu'+(r.signed?' (signature vérifiée)':' (sans secret : signature non vérifiée)'):'❌ Échec ('+r.status+')')}catch(e){toast('❌ '+e.message)}}
+async function pbTestClear(){try{const r=await api('/api/pb-test/clear','POST',{});await refresh();toast('Tests effacés : '+r.removed)}catch(e){toast('❌ '+e.message)}}
 function saveNetwork(){const s=S.settings,v=id=>$('#'+id).value.trim();s.param=v('n_sub').replace(/[^\w-]/g,'')||'sub1';s.linkParam=v('n_lsub').replace(/[^\w-]/g,'')||'s1';s.map=Object.assign(s.map||{},{event:v('n_event'),amount:v('n_amount'),commission:v('n_commission'),tx:v('n_tx'),reg:v('n_reg'),ftd:v('n_ftd'),dep:v('n_dep'),com:v('n_com')});s.baSecret=($('#n_secret')||{value:s.baSecret||''}).value.trim();s.macroL=v('n_l')||'{';s.macroR=v('n_r')||'}';save();toast('Enregistré');render()}
 function saveTg(){Object.assign(S.settings,{tgOn:$('#t_on').checked,tgToken:$('#t_tok').value.trim(),tgChat:$('#t_chat').value.trim()});save();toast('Enregistré')}
 async function testTg(){saveTg();clearTimeout(saveT);await pushConfig();try{await api('/api/tg-test','POST',{});toast('Message Telegram envoyé')}catch(e){toast(e.message)}}
@@ -427,25 +457,75 @@ async function resetAll(){if(!confirm('Tout effacer ? Sous-affiliés, messages, 
 /* ============ SYNCHRO POSTBACKS (fusion: le serveur ne met à jour QUE les stats) ============ */
 async function syncAll(){await refresh(false);toast('Actualisé')}
 
+/* ============ NOTIFICATIONS PUSH (réelles) ============ */
+let PUSH={st:'chk'}; // chk | on | off | busy | ios | denied | unsupported
+const isAdm=()=>!!session&&session.role==='a';
+const pushSupported=()=>'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
+const b64u=k=>{const p='='.repeat((4-k.length%4)%4),r=atob((k+p).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(r,c=>c.charCodeAt(0))};
+function pushPaint(){if(session&&ready&&page==='home'&&safeToRender())render()}
+async function pushCheck(){
+ const prev=PUSH.st;let st;
+ if(isIOS()&&!isStandalone())st='ios';
+ else if(!pushSupported())st='unsupported';
+ else if(Notification.permission==='denied')st='denied';
+ else{try{const reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();st=sub&&(await api('/api/push/status','POST',{endpoint:sub.endpoint})).on?'on':'off'}catch(e){st='off'}}
+ if(PUSH.st==='busy'||!auth)return;PUSH.st=st;if(st!==prev)pushPaint()}
+async function pushToggle(){
+ const st=PUSH.st;if(st==='busy'||st==='chk')return;
+ const info={ios:"Sur iPhone / iPad, les notifications ne marchent que si l'application est installée : ouvre le site dans Safari, touche Partager (carré avec une flèche) puis « Sur l'écran d'accueil ». Ouvre ensuite l'app depuis son icône et active les notifications ici.",
+  denied:"Les notifications sont bloquées pour ce site. Autorise-les dans les réglages de ton navigateur ou de ton téléphone (réglages du site → Notifications), puis reviens ici.",
+  unsupported:"Ce navigateur ne gère pas les notifications. Utilise Chrome, Edge, Firefox ou Safari (iPhone : iOS 16.4 minimum, application installée)."};
+ if(info[st]){alert(info[st]);render();return}
+ const perm=st==='off'?Notification.requestPermission():null; // appelé directement dans le geste de l'utilisateur
+ PUSH.st='busy';render();
+ try{
+  const reg=await navigator.serviceWorker.ready;
+  if(st==='on'){
+   const sub=await reg.pushManager.getSubscription();
+   if(sub){try{await api('/api/push/unsubscribe','POST',{endpoint:sub.endpoint})}catch(e){}await sub.unsubscribe()}
+   PUSH.st='off';toast('Notifications désactivées')}
+  else{
+   if(await perm!=='granted'){PUSH.st=Notification.permission==='denied'?'denied':'off';render();return}
+   const {key}=await api('/api/push/key');
+   let sub=await reg.pushManager.getSubscription();
+   if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(key)});
+   let r;
+   try{r=await api('/api/push/subscribe','POST',{subscription:sub.toJSON()})}
+   catch(e){await sub.unsubscribe().catch(()=>{});throw e}
+   PUSH.st='on';if(r.delivered)toast('Notifications activées ✅');else{toast("L'envoi test a échoué — réessaie");await pushCheck()}}
+ }catch(e){PUSH.st='off';toast(e.message&&e.message!=='Failed to fetch'?e.message:"Impossible d'activer les notifications");try{await pushCheck()}catch(x){}}
+ render()}
+async function pushTest(){try{await api('/api/push/test','POST',{});toast('Test envoyé — regarde tes notifications')}catch(e){toast(e.message)}}
+function pushDetach(){ // à la déconnexion : cet appareil ne reçoit plus les notifications de ce compte
+ if(!auth||!pushSupported())return;const h=hdrs();
+ navigator.serviceWorker.getRegistration().then(r=>r&&r.pushManager.getSubscription()).then(sub=>{if(sub)fetch('/api/push/unsubscribe',{method:'POST',headers:h,body:JSON.stringify({endpoint:sub.endpoint}),keepalive:true})}).catch(()=>{})}
+function userLogout(){pushDetach();logout()}
+function pushCard(){
+ const st=PUSH.st,on=st==='on',txt={chk:'Vérification…',on:'Activées sur cet appareil. Tu es alerté en temps réel.',off:isAdm()?'Reçois une alerte pour chaque nouveau message, retrait ou inscription.':'Reçois une alerte pour chaque message, FTD, annonce ou paiement.',busy:'Un instant…',ios:"Sur iPhone, installe d'abord l'application sur ton écran d'accueil.",denied:'Bloquées par ton navigateur : autorise-les dans les réglages du site.',unsupported:'Non disponibles sur ce navigateur.'}[st];
+ return `<div class="card" style="padding:14px 18px;margin-bottom:15px"><label class="chk" style="margin:0"><input type="checkbox" ${on?'checked':''} ${st==='busy'||st==='chk'?'disabled':''} onchange="pushToggle()"><i class="sw"></i><span><b style="display:flex;gap:6px;align-items:center"><span style="color:var(--ic)">${ic.bell}</span>Notifications</b><small style="color:var(--dim);font-size:12px;line-height:1.4;display:block;margin-top:2px">${txt}</small></span></label>${on?`<div style="margin-top:10px"><button class="btn g s n" onclick="pushTest()">Envoyer un test</button></div>`:''}</div>`}
+if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',e=>{const d=e.data;if(d&&d.type==='go'&&session&&ready){const ok=(isAdm()?NAV_A:NAV_M).some(n=>n[0]===d.page);go(ok?d.page:'home');refresh(true)}});
+let INIT_PAGE=new URLSearchParams(location.search).get('p')||'';
+
 /* ============ MEMBRE ============ */
 function memberPage(){return({home:mHome,tuto:mTuto,msg:mMsg,bal:mBal,rew:mRew,ref:mRef,tips:tips,games:mGames,comm:mComm})[page]()}
 function mHome(){
  const s=me(),st=stat(s),conv=st.inscriptions?(st.ftd/st.inscriptions*100).toFixed(1):'0.0';
- const links=(s.links||[]).map(l=>`<div class="inner"><small>${esc(l.name)}</small><div class="mono">${esc(withSub(l.url,s.code))}</div><button class="btn s" style="margin-top:8px" onclick="copy('${esc(withSub(l.url,s.code))}')">Copier</button></div>`).join('');
- return `<div class="row" style="justify-content:space-between;margin-bottom:4px"><div class="pill ok n">${ic.bell} Notifications activées</div><a onclick="syncSelf()" style="color:var(--dim);cursor:pointer;font-size:13px;display:flex;gap:5px;align-items:center;justify-content:flex-end">${ic.sync} Actualiser</a></div>
+ const links=(s.links||[]).filter(l=>l.url).map(l=>`<div class="inner"><small>${esc(l.name)}</small><div class="mono">${esc(withSub(l.url,s.code))}</div><button class="btn s" style="margin-top:8px" onclick="copy('${esc(withSub(l.url,s.code))}')">Copier</button></div>`).join('');
+ return `<div class="row" style="justify-content:flex-end;margin-bottom:8px"><a onclick="syncSelf()" style="color:var(--dim);cursor:pointer;font-size:13px;display:flex;gap:5px;align-items:center;justify-content:flex-end">${ic.sync} Actualiser</a></div>
+ ${pushCard()}
  <h1 style="font-size:26px">Bonjour, ${esc(s.name)} 👋</h1><p class="sub">Aperçu de votre activité</p>
  ${S.announce.length?`<div class="card" style="border-color:rgba(255,255,255,.35)"><h3>📣 Annonce</h3><p style="margin:0;color:var(--tx)">${esc(S.announce[0].text)}</p></div>`:''}
- <div class="card"><h3 style="color:var(--dim);font-size:14px">Tes liens d'affiliation</h3>${links||'<p>Aucun lien pour le moment.</p>'}</div>
+ <div class="card"><h3 style="color:var(--dim);font-size:14px">Tes liens d'affiliation</h3>${links||'<div class="note" style="text-align:center">⏳ Patiente un peu : ton lien personnel est en cours de préparation et va arriver très bientôt.</div>'}</div>
  ${s.landing?`<div class="card"><h3 style="color:var(--dim);font-size:14px">Ta landing page</h3><div class="inner"><div class="mono">${esc(s.landing)}</div><p style="margin:6px 0 12px">💡 À utiliser en priorité sur TikTok, elle convertit généralement mieux qu'un lien direct.</p><button class="btn s" onclick="copy('${esc(s.landing)}')">Copier</button></div></div>`:''}
  <div class="stats"><div class="stat"><span>Inscriptions</span><b>${st.inscriptions}</b></div><div class="stat"><span>FTD</span><b>${st.ftd}</b></div><div class="stat"><span>Conversion</span><b>${conv}%</b></div><div class="stat"><span>Dépôts</span><b>${eur(st.deposits)}</b></div><div class="stat"><span>Mes revenus</span><b>${eur(earned(s))}</b></div><div class="stat"><span>Chiffre d'affaires</span><b>${eur(st.ca)}</b></div></div>`;
 }
 function syncSelf(){refresh(false).then(()=>toast('Actualisé'))}
 function mTuto(){
- const s=me(),l=(s.links||[])[0],g=S.settings.games[0];
+ const s=me(),l=(s.links||[]).filter(x=>x.url)[0],g=S.settings.games[0];
  const st=(n,t,body)=>`<div class="card"><div class="step"><i>${n}</i><h4>${t}</h4></div>${body}</div>`;
  return `<div style="color:var(--ic);font-weight:700;letter-spacing:.08em;font-size:13px">TUTORIEL</div><h1 style="font-size:27px">Comment générer tes premiers FTD 🔥</h1><p class="sub">Bienvenue ${esc(s.name)} — suis ces 5 étapes pour toucher tes premiers paiements.</p>
  ${g?`<div class="card" style="display:flex;justify-content:space-between;align-items:center"><div><div style="color:var(--ic);font-weight:700;letter-spacing:.08em;font-size:11px">JEU SUGGÉRÉ</div><b style="font-size:17px">${esc(g.name)}</b></div><a class="btn g s" href="${esc(withSub(g.url,s.code))}" target="_blank">Ouvrir</a></div>`:''}
- ${st(1,'Copie ton lien personnel',`<p>Ce lien est unique à toi. Chaque inscription et chaque FTD sont trackés automatiquement.</p>${l?`<div class="inner row" style="flex-wrap:nowrap"><div class="mono">${esc(withSub(l.url,s.code))}</div><button class="x n" onclick="copy('${esc(withSub(l.url,s.code))}')">${ic.copy}</button></div>`:''}<p>💡 Ne change jamais ce lien — toutes tes performances passées y sont attachées.</p>`)}
+ ${st(1,'Copie ton lien personnel',`<p>Ce lien est unique à toi. Chaque inscription et chaque FTD sont trackés automatiquement.</p>${l?`<div class="inner row" style="flex-wrap:nowrap"><div class="mono">${esc(withSub(l.url,s.code))}</div><button class="x n" onclick="copy('${esc(withSub(l.url,s.code))}')">${ic.copy}</button></div>`:'<div class="note" style="text-align:center">⏳ Patiente un peu : ton lien personnel est en cours de préparation et va arriver très bientôt.</div>'}<p>💡 Ne change jamais ce lien — toutes tes performances passées y sont attachées.</p>`)}
  ${st(2,'Mets-le dans ta bio',`<p>TikTok/Instagram → Profil → Modifier le profil → colle ton lien dans le champ "Site web".</p><div class="note">⚠️ Sans lien en bio, aucune conversion possible — c'est le seul moyen pour les gens de cliquer.</div>`)}
  ${st(3,'Crée du contenu',`<p>Montre l'ambiance, partage des moments marquants. Les vidéos qui marchent partagent un point commun :</p><ul style="color:var(--dim);font-size:12px;line-height:1.7"><li>3-5 premières secondes <b style="color:var(--tx)">accrocheuses</b></li><li>Format vertical, durée 15-60 secondes</li><li>Un CTA clair en fin de vidéo : « Lien en bio »</li></ul><p>Plus d'astuces détaillées dans l'onglet "Conseils & Stratégie".</p>`)}
  ${st(4,'Poste et laisse le lien 48h minimum',`<p>🕐 Heures de pointe : 18h-23h<br>📌 Une fois posté, ne change pas ton lien en bio pendant 48h minimum.<br>🔁 La régularité fait le coup d'éclat — vise 1 publication par jour.</p>`)}
@@ -469,10 +549,10 @@ function mRew(){
 }
 async function claimRew(ftd){const d=prompt('Tes coordonnées de paiement (IBAN / crypto) :');if(!d)return;try{await api('/api/me/claim','POST',{ftd,details:d});toast('Demande envoyée');await refresh(false)}catch(e){toast(e.message)}}
 function mRef(){
- const s=me(),url=location.href.split('?')[0]+'?ref='+encodeURIComponent(s.code),fil=S.subs.filter(x=>x.referrer===s.id);
+ const s=me(),url=location.origin+'/?ref='+encodeURIComponent(s.id),fil=S.subs.filter(x=>x.referrer===s.id);
  const msg=`Rejoins-moi sur ${brand()} : ${url}`;
  return `<h1>Parrainage</h1><p class="sub">Parraine d'autres affiliés et gagne ${eur(S.settings.refComm)} pour chaque FTD qu'ils génèrent.</p>
- <div class="card"><h3>Comment parrainer ?</h3><p>Invite quelqu'un à rejoindre l'équipe et dis à l'admin qu'il vient de ta part : il sera rattaché à toi et tu touches ${eur(S.settings.refComm)} pour chaque FTD qu'il génère.</p></div>
+ <div class="card"><h3>Ton lien de parrainage</h3><p>Partage ce lien : la personne crée son compte et elle est rattachée à toi automatiquement. Tu touches ${eur(S.settings.refComm)} pour chaque FTD qu'elle génère.</p><input readonly value="${esc(url)}" onclick="this.select()"><p style="margin-top:12px">Ton code de parrainage : <b>${esc(s.id.toUpperCase())}</b></p><div class="row" style="margin-top:8px"><button class="btn s n" onclick="copy('${url}')">Copier le lien</button><button class="btn g s n" onclick="copy('${s.id.toUpperCase()}')">Copier le code</button>${navigator.share?`<button class="btn g s n" onclick="shareRef()">Partager</button>`:''}</div></div>
  <div class="stats"><div class="stat"><span>Filleuls</span><b>${fil.length}</b></div><div class="stat"><span>Revenus de parrainage</span><b>${eur(fil.reduce((a,f)=>a+stat(f).ftd*S.settings.refComm,0))}</b></div></div>
  <div class="card tw"><h3 style="padding:14px 24px 0">Mes filleuls</h3><table><tr><th>Nom</th><th>Depuis le</th><th>Statut</th><th>FTD générés</th></tr>${fil.map(f=>`<tr><td>${esc(f.name)}</td><td>${fmtD(f.created)}</td><td>${stat(f).ftd?'Actif':'Inscrit'}</td><td>${stat(f).ftd}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">Tu n\'as encore parrainé personne.</td></tr>'}</table></div>
  <div class="card tw"><h3 style="padding:14px 24px 0">Historique des commissions de parrainage</h3><table><tr><th>Date</th><th>Filleul</th><th>FTD</th><th>Montant</th></tr><tr><td colspan="4" class="empty">Aucune commission de parrainage pour le moment.</td></tr></table></div>`;
@@ -483,7 +563,7 @@ function mComm(){return `<h1>Communauté</h1><p class="sub">Rejoins la communaut
 /* ============ DÉMARRAGE ============ */
 applyBrand();
 if(auth)startSession();else render();
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&auth&&ready)refresh(true)});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&auth&&ready){refresh(true);pushCheck()}});
 </script>
 </body>
 </html>

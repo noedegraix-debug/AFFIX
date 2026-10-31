@@ -15,6 +15,7 @@ const express = require('express');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const webpush = require('web-push');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -24,6 +25,7 @@ const DATA_DIR = process.env.DATA_DIR || __dirname;
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
 const EVENTS_FILE = path.join(DATA_DIR, 'events.json');
 const SECRET = process.env.BLUE_AFFILIATES_SECRET || '';
+const PORT = process.env.PORT || 3000;
 
 let pool = null;
 if (process.env.DATABASE_URL) {
@@ -42,11 +44,11 @@ const defState = () => ({
     adminCode: 'Admin2024', codeReset: true,
     mainLink: '', tgOn: false, tgToken: '', tgChat: '', refComm: 5,
     tiers: [{ ftd: 10, reward: 50 }, { ftd: 100, reward: 500 }, { ftd: 500, reward: 1000 }, { ftd: 1000, reward: 2000 }, { ftd: 2000, reward: 4000 }],
-    wDay: 10, param: 'sub1', linkParam: 's1', baSecret: '', games: [], useful: [], community: [],
+    wDay: 10, param: 'sub1', linkParam: 's1', baSecret: '', signupOn: true, signupApprove: true, signupComm: 30, signupLinks: [], games: [], useful: [], community: [],
     brand: 'AFFIX', colorA: '#ffffff', colorB: '#a1a1aa', logo: '/assets/logo.png', macroL: '{', macroR: '}',
     map: { event: 'event', amount: 'amount', commission: 'commission', tx: 'transaction_id', reg: 'registration', ftd: 'ftd', dep: 'deposit', com: 'commission_paid', qual: 'qualification', rs: 'revshare' }
   },
-  subs: [], payments: [], msgs: {}, rewardsClaimed: {}, announce: []
+  subs: [], payments: [], msgs: {}, rewardsClaimed: {}, announce: [], push: {}, adminPush: []
 });
 let state = defState();
 let events = [];
@@ -75,6 +77,7 @@ async function initStore() {
   const st0 = state.settings;
   if (st0.brand === 'Blue Dash' && st0.colorA === '#3b82f6') Object.assign(st0, { brand: 'AFFIX', colorA: '#ffffff', colorB: '#a1a1aa' });
   if (st0.brand === 'AFFIX' && !st0.logo) st0.logo = '/assets/logo.png';
+  initPush();
 }
 const saveState = () => enqueue(async () => {
   if (pool) await pool.query("insert into kv(k,v) values('state',$1) on conflict(k) do update set v=excluded.v", [JSON.stringify(state)]);
@@ -92,6 +95,21 @@ const clearEvents = () => { events = []; return enqueue(async () => {
 const uid = () => crypto.randomBytes(5).toString('hex');
 const h = (v) => crypto.createHash('sha256').update(String(v)).digest();
 const safeEq = (a, b) => crypto.timingSafeEqual(h(a), h(b));
+const isActive = (s) => !s.status || s.status === 'active';
+const hashPass = (p) => { const salt = crypto.randomBytes(8).toString('hex'); return salt + ':' + crypto.scryptSync(p, salt, 32).toString('hex'); };
+const passCache = new Map();
+// Compte créé par l'admin : le code d'accès sert de mot de passe. Compte inscrit seul : mot de passe haché (le code ne sert qu'au tracking).
+const passOk = (sub, p) => {
+  if (!sub.pass) return safeEq(sub.code, p);
+  const k = crypto.createHash('sha256').update(sub.id + '|' + sub.pass + '|' + p).digest('hex');
+  if (passCache.get(k)) return true;
+  const [salt, hh] = String(sub.pass).split(':');
+  if (!salt || !hh) return false;
+  let ok = false;
+  try { ok = safeEq(crypto.scryptSync(p, salt, 32).toString('hex'), hh); } catch (e) { ok = false; }
+  if (ok) passCache.set(k, true);
+  return ok;
+};
 const str = (v, n = 300) => String(v ?? '').slice(0, n);
 const num = (v, d = 0) => (Number.isFinite(+v) ? +v : d);
 const parisDay = () => parseInt(new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric' }).format(new Date()), 10);
@@ -108,6 +126,50 @@ async function tg(text) {
   } catch (e) { return false; }
 }
 
+/* ================= Notifications push (Web Push / VAPID) ================= */
+// Les clés VAPID sont générées une seule fois puis stockées avec le reste de l'état (aucune config requise).
+// On peut les imposer via VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY.
+function initPush() {
+  if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) state.vapid = { pub: process.env.VAPID_PUBLIC_KEY, priv: process.env.VAPID_PRIVATE_KEY };
+  else if (!state.vapid || !state.vapid.pub || !state.vapid.priv) {
+    const k = webpush.generateVAPIDKeys();
+    state.vapid = { pub: k.publicKey, priv: k.privateKey };
+    saveState();
+  }
+  if (!state.push || typeof state.push !== 'object') state.push = {};
+  if (!Array.isArray(state.adminPush)) state.adminPush = [];
+  webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:admin@affix.app', state.vapid.pub, state.vapid.priv);
+}
+const PUSH_HOSTS = ['googleapis.com', 'mozilla.com', 'mozaws.net', 'apple.com', 'windows.com', 'microsoft.com'];
+const pushEndpointOk = (u) => {
+  try { const x = new URL(u); return x.protocol === 'https:' && PUSH_HOSTS.some((d) => x.hostname === d || x.hostname.endsWith('.' + d)); } catch (e) { return false; }
+};
+const MAX_DEVICES = 8;
+const pushList = (auth) => (auth.role === 'a' ? state.adminPush : state.push[auth.sub.id] || []);
+function removeEndpoints(set) {
+  if (!set.size) return;
+  state.adminPush = state.adminPush.filter((d) => !set.has(d.endpoint));
+  for (const id of Object.keys(state.push)) { state.push[id] = state.push[id].filter((d) => !set.has(d.endpoint)); if (!state.push[id].length) delete state.push[id]; }
+  saveState();
+}
+// Envoie à une liste d'appareils ; retire ceux que le navigateur a supprimés (404/410). Retourne le nombre d'envois réussis.
+async function sendPush(list, p) {
+  const payload = JSON.stringify({ title: str(p.title || state.settings.brand, 80), body: str(p.body, 160), page: p.page || 'home', tag: p.tag || p.page || '' });
+  const dead = new Set(); let ok = 0;
+  await Promise.all(list.map(async (d) => {
+    try { await webpush.sendNotification({ endpoint: d.endpoint, keys: d.keys }, payload, { TTL: 86400, urgency: 'high' }); ok++; }
+    catch (e) { if (e.statusCode === 404 || e.statusCode === 410) dead.add(d.endpoint); else console.warn('push échoué', e.statusCode || '', String(e.body || e.message || '').slice(0, 120)); }
+  }));
+  removeEndpoints(dead);
+  return ok;
+}
+const pushMember = (id, p) => { const l = state.push[id]; if (l && l.length) sendPush(l.slice(), p).catch(() => {}); };
+const pushAdmin = (p) => { if (state.adminPush.length) sendPush(state.adminPush.slice(), p).catch(() => {}); };
+const pushAllMembers = (p) => { for (const s of state.subs) if (isActive(s)) pushMember(s.id, p); };
+// Alerte admin : Telegram (si configuré) + push sur ses appareils
+const alertAdmin = (tgText, title, body, page) => { tg(tgText); pushAdmin({ title, body, page }); };
+const eurS = (n) => (Math.round((+n || 0) * 100) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+
 // Anti brute-force : 15 échecs / 10 min / IP
 const fails = new Map();
 const blocked = (ip) => { const f = fails.get(ip); return f && f.n >= 15 && Date.now() - f.t < 600000; };
@@ -120,7 +182,7 @@ function authenticate(req) {
   if (role === 'a') return safeEq(code, state.settings.adminCode) ? { role: 'a' } : null;
   if (role === 'm') {
     const n = name.trim().toLowerCase();
-    const sub = state.subs.find((x) => x.name.trim().toLowerCase() === n && safeEq(x.code, code));
+    const sub = state.subs.find((x) => x.name.trim().toLowerCase() === n && isActive(x) && passOk(x, code));
     return sub ? { role: 'm', sub } : null;
   }
   return null;
@@ -150,19 +212,20 @@ function computeStats() {
 }
 const withStats = (s, by) => {
   const x = by[s.code];
-  return { ...s, stats: x ? { inscriptions: x.inscriptions, ftd: x.ftd, qualifs: x.qualifs, deposits: x.deposits, ca: x.ca, rs: x.rs } : {}, events: x ? x.events : [] };
+  const { pass, ...rest } = s;
+  return { ...rest, hasPass: !!pass, stats: x ? { inscriptions: x.inscriptions, ftd: x.ftd, qualifs: x.qualifs, deposits: x.deposits, ca: x.ca, rs: x.rs } : {}, events: x ? x.events : [] };
 };
 const publicSettings = (s) => ({ tiers: s.tiers, wDay: s.wDay, refComm: s.refComm, param: s.param, linkParam: s.linkParam, games: s.games, useful: s.useful, community: s.community, brand: s.brand, colorA: s.colorA, colorB: s.colorB, logo: s.logo });
 
 function adminView() {
   const by = computeStats();
   const { adminCode, ...settings } = state.settings;
-  return { pb: { count: events.length, last: events.length ? events[events.length - 1].t : 0 }, defaultCode: safeEq(state.settings.adminCode, 'Admin2024'), settings, subs: state.subs.map((s) => withStats(s, by)), payments: state.payments, msgs: state.msgs, rewardsClaimed: state.rewardsClaimed, announce: state.announce };
+  return { pb: { count: events.length, last: events.length ? events[events.length - 1].t : 0 }, defaultCode: safeEq(state.settings.adminCode, 'Admin2024'), settings, pending: state.subs.filter((s) => !isActive(s)).map((s) => ({ id: s.id, name: s.name, status: s.status, created: s.created, parent: (state.subs.find((x) => x.id === s.referrer) || {}).name || '' })), subs: state.subs.filter(isActive).map((s) => withStats(s, by)), payments: state.payments, msgs: state.msgs, rewardsClaimed: state.rewardsClaimed, announce: state.announce };
 }
 function memberView(sub) {
   const by = computeStats();
   const own = withStats(sub, by);
-  const fil = state.subs.filter((x) => x.referrer === sub.id).map((x) => {
+  const fil = state.subs.filter((x) => isActive(x) && x.referrer === sub.id).map((x) => {
     const w = withStats(x, by);
     return { id: x.id, name: x.name, created: x.created, referrer: x.referrer, stats: w.stats };
   });
@@ -186,7 +249,8 @@ app.post('/api/login', (req, res) => {
     if (safeEq(str(code), state.settings.adminCode)) return res.json({ ok: true, role: 'a' });
   } else {
     const n = str(name).trim().toLowerCase();
-    const sub = state.subs.find((x) => x.name.trim().toLowerCase() === n && safeEq(x.code, str(code)));
+    const sub = state.subs.find((x) => x.name.trim().toLowerCase() === n && passOk(x, str(code)));
+    if (sub && !isActive(sub)) return res.status(403).json({ error: sub.status === 'refused' ? 'Ton inscription n\'a pas été acceptée.' : 'Ton inscription est en attente de validation. Reviens un peu plus tard.', pending: sub.status !== 'refused' });
     if (sub) return res.json({ ok: true, role: 'm', id: sub.id });
   }
   fail(req.ip);
@@ -219,6 +283,10 @@ app.put('/api/config', need('a'), async (req, res) => {
     const lg = str(s.logo, 600).trim(); cur.logo = /^(https:\/\/\S+|\/assets\/[\w.-]+)$/.test(lg) ? lg : '';
     cur.macroL = str(s.macroL, 3) || '{'; cur.macroR = str(s.macroR, 3) || '}';
     if (s.map && typeof s.map === 'object') for (const k of Object.keys(cur.map)) { const v = str(s.map[k], 40).trim().replace(/[^\w.\- ]/g, ''); if (v) cur.map[k] = v; }
+    if (typeof s.signupOn === 'boolean') cur.signupOn = s.signupOn;
+    if (typeof s.signupApprove === 'boolean') cur.signupApprove = s.signupApprove;
+    if (s.signupComm !== undefined) cur.signupComm = num(s.signupComm, 30);
+    if (Array.isArray(s.signupLinks)) cur.signupLinks = cleanLinks(s.signupLinks);
     cur.games = cleanLinks(s.games); cur.useful = cleanLinks(s.useful); cur.community = cleanLinks(s.community);
   }
   if (Array.isArray(b.subs)) {
@@ -228,16 +296,30 @@ app.put('/api/config', need('a'), async (req, res) => {
       if (!name || !code) return res.status(400).json({ error: 'Nom et code requis' });
       if (seenId.has(id) || seenCode.has(code)) return res.status(400).json({ error: 'Code ou identifiant en double : ' + code });
       seenId.add(id); seenCode.add(code);
-      out.push({ id, name, code, links: cleanLinks(x.links), commission: num(x.commission, 30), landing: str(x.landing, 600), referrer: seenId.has(x.referrer) || b.subs.some((y) => y.id === x.referrer) ? str(x.referrer, 40) : '', created: num(x.created, Date.now()) });
+      const prev = state.subs.find((p) => p.id === id) || {};
+      let pass = prev.pass;
+      if (typeof x.newPass === 'string' && x.newPass.length >= 6) pass = hashPass(x.newPass.slice(0, 100));
+      out.push({ ...(pass ? { pass } : {}), ...(prev.selfReg ? { selfReg: true } : {}), id, name, code, links: cleanLinks(x.links), commission: num(x.commission, 30), landing: str(x.landing, 600), referrer: seenId.has(x.referrer) || b.subs.some((y) => y.id === x.referrer) ? str(x.referrer, 40) : '', created: num(x.created, Date.now()) });
+    }
+    if (Array.isArray(b.seen)) { // inscrits arrivés depuis la dernière synchro de l'admin : on les garde
+      const inP = new Set(out.map((s) => s.id)), seen = new Set(b.seen.map(String));
+      for (const s of state.subs) if (!inP.has(s.id) && !seen.has(s.id)) out.push(s);
     }
     const keep = new Set(out.map((s) => s.id));
     for (const id of Object.keys(state.msgs)) if (!keep.has(id)) delete state.msgs[id];
     for (const id of Object.keys(state.rewardsClaimed)) if (!keep.has(id)) delete state.rewardsClaimed[id];
     state.subs = out;
   }
-  if (Array.isArray(b.announce)) state.announce = b.announce.slice(0, 20).map((a) => ({ text: str(a.text, 1000), t: num(a.t, Date.now()) }));
+  let newAnn = [];
+  if (Array.isArray(b.announce)) {
+    const had = new Set(state.announce.map((a) => a.t + '|' + a.text));
+    state.announce = b.announce.slice(0, 20).map((a) => ({ text: str(a.text, 1000), t: num(a.t, Date.now()) }));
+    newAnn = state.announce.filter((a) => a.text && !had.has(a.t + '|' + a.text));
+  }
+  if (Array.isArray(b.subs)) { for (const id of Object.keys(state.push)) if (!state.subs.some((x) => x.id === id)) delete state.push[id]; }
   await saveState();
   res.json({ ok: true });
+  if (newAnn.length) pushAllMembers({ title: '📣 Annonce', body: newAnn[0].text, page: 'home' });
 });
 
 app.post('/api/msg/:id', need('a'), async (req, res) => {
@@ -246,12 +328,14 @@ app.post('/api/msg/:id', need('a'), async (req, res) => {
   if (!sub || !text) return res.status(400).json({ error: 'Message invalide' });
   (state.msgs[sub.id] = state.msgs[sub.id] || []).push({ from: 'a', text, t: Date.now() });
   await saveState(); res.json({ ok: true });
+  pushMember(sub.id, { title: '💬 Nouveau message', body: text, page: 'msg' });
 });
 app.post('/api/pay/:id/paid', need('a'), async (req, res) => {
   const p = state.payments.find((x) => x.id === req.params.id);
   if (!p) return res.status(404).json({ error: 'Introuvable' });
   p.status = 'paid'; p.paidAt = Date.now();
   await saveState(); res.json({ ok: true });
+  pushMember(p.subId, { title: '✅ Paiement effectué', body: (p.type === 'r' ? (p.label || 'Reward') : 'Ton retrait') + ' de ' + eurS(p.amount) + ' a été payé.', page: p.type === 'r' ? 'rew' : 'bal' });
 });
 app.delete('/api/pay/:id', need('a'), async (req, res) => {
   state.payments = state.payments.filter((x) => x.id !== req.params.id);
@@ -269,7 +353,9 @@ app.post('/api/import', need('a'), async (req, res) => {
   if (!d || typeof d !== 'object') return res.status(400).json({ error: 'Fichier invalide' });
   const code = state.settings.adminCode;
   const base = defState();
+  const keepVapid = state.vapid, keepAdminPush = state.adminPush, oldPush = state.push;
   state = {
+    vapid: keepVapid, adminPush: keepAdminPush, push: {},
     settings: Object.assign(base.settings, d.settings || {}, { adminCode: code }),
     subs: (Array.isArray(d.subs) ? d.subs : []).map((x) => ({ id: str(x.id, 40) || uid(), name: str(x.name, 80), code: str(x.code, 60), links: cleanLinks(x.links), commission: num(x.commission, 30), landing: str(x.landing, 600), referrer: str(x.referrer, 40), created: num(x.created, Date.now()) })),
     payments: Array.isArray(d.payments) ? d.payments : [],
@@ -277,11 +363,12 @@ app.post('/api/import', need('a'), async (req, res) => {
     rewardsClaimed: d.rewardsClaimed && typeof d.rewardsClaimed === 'object' ? d.rewardsClaimed : {},
     announce: Array.isArray(d.announce) ? d.announce : []
   };
+  for (const x of state.subs) if (oldPush[x.id]) state.push[x.id] = oldPush[x.id];
   await saveState(); res.json({ ok: true });
 });
 app.post('/api/reset', need('a'), async (req, res) => {
-  const code = state.settings.adminCode;
-  state = defState(); state.settings.adminCode = code;
+  const code = state.settings.adminCode, keepVapid = state.vapid, keepAdminPush = state.adminPush;
+  state = defState(); state.settings.adminCode = code; state.vapid = keepVapid; state.adminPush = keepAdminPush;
   await saveState(); await clearEvents(); res.json({ ok: true });
 });
 app.post('/api/tg-test', need('a'), async (req, res) => {
@@ -289,12 +376,45 @@ app.post('/api/tg-test', need('a'), async (req, res) => {
   res.status(ok ? 200 : 400).json(ok ? { ok: true } : { error: 'Échec : vérifie le token, le chat ID et que les notifications sont activées (enregistre d\'abord)' });
 });
 
+/* ================= Notifications push : appareils ================= */
+app.get('/api/push/key', (_, res) => res.json({ key: state.vapid.pub }));
+app.post('/api/push/status', need(), (req, res) => {
+  const ep = str(req.body && req.body.endpoint, 1200);
+  res.json({ on: pushList(req.auth).some((d) => d.endpoint === ep) });
+});
+app.post('/api/push/subscribe', need(), async (req, res) => {
+  const sb = (req.body && req.body.subscription) || {};
+  const endpoint = str(sb.endpoint, 1200), k = sb.keys || {};
+  const p256dh = str(k.p256dh, 200), authK = str(k.auth, 100);
+  if (!pushEndpointOk(endpoint) || !p256dh || !authK) return res.status(400).json({ error: 'Abonnement invalide' });
+  removeEndpoints(new Set([endpoint])); // un appareil n'appartient qu'à un seul compte
+  const dev = { endpoint, keys: { p256dh, auth: authK }, ua: str(req.get('user-agent'), 120), t: Date.now() };
+  let list;
+  if (req.auth.role === 'a') list = state.adminPush; else list = (state.push[req.auth.sub.id] = state.push[req.auth.sub.id] || []);
+  list.push(dev);
+  while (list.length > MAX_DEVICES) list.shift();
+  await saveState();
+  const delivered = (await sendPush([dev], { title: state.settings.brand, body: '✅ Notifications activées sur cet appareil', page: 'home', tag: 'welcome' })) > 0;
+  res.json({ ok: true, delivered });
+});
+app.post('/api/push/unsubscribe', need(), async (req, res) => {
+  removeEndpoints(new Set([str(req.body && req.body.endpoint, 1200)].filter((e) => pushList(req.auth).some((d) => d.endpoint === e))));
+  await saveState(); res.json({ ok: true });
+});
+app.post('/api/push/test', need(), async (req, res) => {
+  const list = pushList(req.auth).slice();
+  if (!list.length) return res.status(400).json({ error: 'Aucun appareil enregistré : active d\'abord les notifications' });
+  const n = await sendPush(list, { title: state.settings.brand, body: '🔔 Notification de test : tout fonctionne !', page: 'home', tag: 'test' });
+  if (!n) return res.status(502).json({ error: 'Envoi impossible. Désactive puis réactive les notifications sur cet appareil.' });
+  res.json({ ok: true, sent: n });
+});
+
 /* ================= Membre ================= */
 app.post('/api/me/msg', need('m'), async (req, res) => {
   const sub = req.auth.sub, text = str(req.body && req.body.text, 2000).trim();
   if (!text) return res.status(400).json({ error: 'Message vide' });
   (state.msgs[sub.id] = state.msgs[sub.id] || []).push({ from: 'm', text, t: Date.now() });
-  await saveState(); tg(`💬 Nouveau message de ${sub.name}`); res.json({ ok: true });
+  await saveState(); alertAdmin(`💬 Nouveau message de ${sub.name}`, '💬 Nouveau message', `${sub.name} : ${text}`, 'msg'); res.json({ ok: true });
 });
 app.post('/api/me/withdraw', need('m'), async (req, res) => {
   const sub = req.auth.sub, details = str(req.body && req.body.details, 500).trim();
@@ -304,7 +424,7 @@ app.post('/api/me/withdraw', need('m'), async (req, res) => {
   const amount = Math.round((earnedOf(sub) - withdrawnOf(sub.id)) * 100) / 100;
   if (amount <= 0) return res.status(400).json({ error: 'Solde insuffisant' });
   state.payments.push({ id: uid(), subId: sub.id, type: 'w', amount, date: Date.now(), details, status: 'pending' });
-  await saveState(); tg(`💸 Demande de retrait ${amount.toFixed(2)} € — ${sub.name}`); res.json({ ok: true });
+  await saveState(); alertAdmin(`💸 Demande de retrait ${amount.toFixed(2)} € — ${sub.name}`, '💸 Demande de retrait', `${sub.name} — ${eurS(amount)}`, 'pay'); res.json({ ok: true });
 });
 app.post('/api/me/claim', need('m'), async (req, res) => {
   const sub = req.auth.sub, ftd = num(req.body && req.body.ftd, -1), details = str(req.body && req.body.details, 500).trim();
@@ -317,7 +437,7 @@ app.post('/api/me/claim', need('m'), async (req, res) => {
   if (cl.includes(ftd)) return res.status(400).json({ error: 'Reward déjà demandé' });
   cl.push(ftd);
   state.payments.push({ id: uid(), subId: sub.id, type: 'r', label: 'Bonus ' + ftd + ' FTD', amount: tier.reward, date: Date.now(), details, status: 'pending' });
-  await saveState(); tg(`🎁 Reward ${tier.reward} € demandé — ${sub.name}`); res.json({ ok: true });
+  await saveState(); alertAdmin(`🎁 Reward ${tier.reward} € demandé — ${sub.name}`, '🎁 Reward demandé', `${sub.name} — ${eurS(tier.reward)}`, 'pay'); res.json({ ok: true });
 });
 
 /* ================= Postbacks Blue Affiliates ================= */
@@ -359,16 +479,130 @@ app.get('/postback', async (req, res) => {
     currency: str(clean(q.currency), 6), campaign: str(clean(q.campaign_slug), 60), player: str(clean(q.player_token), 80), username: str(clean(q.username), 60), s2: str(clean(q.sub2), 60), s3: str(clean(q.sub3), 60)
   });
   res.send('ok');
+  if (type === 'registration' || type === 'ftd') {
+    const code = str(q[p] || q.sub1 || q.sub, 60).trim();
+    const sub = code && state.subs.find((x) => x.code === code && isActive(x));
+    if (sub) {
+      if (type === 'registration') pushMember(sub.id, { title: '👤 Nouvelle inscription', body: 'Un joueur vient de s\'inscrire avec ton lien.', page: 'home' });
+      else {
+        pushMember(sub.id, { title: '🎉 Nouveau FTD !', body: '+' + eurS(sub.commission) + ' de commission', page: 'home' });
+        const parent = sub.referrer && state.subs.find((x) => x.id === sub.referrer && isActive(x));
+        if (parent) pushMember(parent.id, { title: '🎉 FTD d\'un filleul', body: sub.name + ' vient de générer un FTD (+' + eurS(state.settings.refComm) + ').', page: 'ref' });
+      }
+    }
+  }
+});
+
+/* ================= Test de réception (admin) ================= */
+// Envoie un vrai postback signé à ce même serveur (code « TEST », sans effet sur les gains) puis permet de l'effacer.
+app.post('/api/pb-test', need('a'), async (req, res) => {
+  const st = state.settings, m = st.map;
+  const q = { [m.event]: m.reg, clickid: 'TEST', [st.param || 'sub1']: 'TEST', [m.tx]: 'TEST-' + Date.now(), [m.amount]: '10', [m.commission]: '1', country: 'FR' };
+  const SEC = secret();
+  const base = Object.keys(q).sort().map((k) => k + '=' + q[k]).join('&');
+  const qs = Object.keys(q).map((k) => encodeURIComponent(k) + '=' + encodeURIComponent(q[k])).join('&') + (SEC ? '&sig=' + crypto.createHmac('sha256', SEC).update(base).digest('hex') : '');
+  try {
+    const r = await fetch('http://127.0.0.1:' + PORT + '/postback?' + qs);
+    res.json({ ok: r.status === 200, status: r.status, signed: !!SEC, total: events.length });
+  } catch (e) { res.status(500).json({ ok: false, error: String(e.message || e) }); }
+});
+app.post('/api/pb-test/clear', need('a'), async (req, res) => {
+  const before = events.length;
+  events = events.filter((e) => !String(e.tx || '').startsWith('TEST-'));
+  await enqueue(async () => {
+    if (pool) await pool.query("delete from events where data->>'tx' like 'TEST-%'");
+    else fs.writeFileSync(EVENTS_FILE, JSON.stringify(events));
+  });
+  res.json({ ok: true, removed: before - events.length });
 });
 
 /* ================= App ================= */
 const escHtml = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-app.use('/assets', express.static(path.join(__dirname, 'assets'), { maxAge: '7d' }));
+app.get('/assets/:f', (req, res, next) => {
+  const f = req.params.f;
+  if (!/^[\w.-]+\.(png|webp|ico|svg)$/.test(f) || f.includes('..')) return next();
+  for (const dir of [path.join(__dirname, 'assets'), __dirname]) {
+    const p = path.join(dir, f);
+    if (fs.existsSync(p)) { res.set('Cache-Control', 'public, max-age=604800'); return res.sendFile(p); }
+  }
+  next();
+});
+// Service worker : installable + notifications push
+app.get('/sw.js', (_, res) => {
+  res.set({ 'Cache-Control': 'no-cache', 'Service-Worker-Allowed': '/' }).type('application/javascript').send(
+`const C='shell-v2';
+self.addEventListener('install',()=>self.skipWaiting());
+self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
+self.addEventListener('fetch',e=>{const r=e.request;if(r.method!=='GET'||r.mode!=='navigate')return;
+e.respondWith(fetch(r).then(x=>{const c=x.clone();caches.open(C).then(k=>k.put('/',c));return x}).catch(()=>caches.match('/').then(m=>m||new Response('Hors ligne',{status:503}))))});
+self.addEventListener('push',e=>{
+ let d={};try{d=e.data?e.data.json():{}}catch(x){d={body:e.data?e.data.text():''}}
+ e.waitUntil(self.registration.showNotification(d.title||'Notification',{body:d.body||'',icon:'/assets/icon-192.png',badge:'/assets/mark.png',tag:d.tag||undefined,renotify:!!d.tag,data:{page:d.page||'home'}}))});
+self.addEventListener('notificationclick',e=>{
+ e.notification.close();const pg=(e.notification.data&&e.notification.data.page)||'home';
+ e.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(cs=>{
+  for(const c of cs){if('focus' in c){c.postMessage({type:'go',page:pg});return c.focus()}}
+  return self.clients.openWindow('/?p='+pg)}))});`);
+});
+
+/* ================= Inscription publique & parrainage ================= */
+const regHits = new Map();
+app.get('/api/ref/:id', (req, res) => {
+  const s = state.subs.find((x) => isActive(x) && x.id.toLowerCase() === String(req.params.id || '').trim().toLowerCase());
+  if (!s) return res.status(404).json({ error: 'Lien de parrainage introuvable' });
+  res.json({ name: s.name });
+});
+app.post('/api/register', async (req, res) => {
+  const st = state.settings;
+  if (st.signupOn === false) return res.status(403).json({ error: 'Les inscriptions sont fermées' });
+  const now = Date.now(), hits = (regHits.get(req.ip) || []).filter((t) => now - t < 3600000);
+  if (hits.length >= 5) return res.status(429).json({ error: 'Trop d\'inscriptions depuis cette connexion, réessaie plus tard' });
+  const { name, pass, ref } = req.body || {};
+  const nm = str(name, 40).trim().replace(/\s+/g, ' ');
+  if (nm.length < 2) return res.status(400).json({ error: 'Nom trop court (2 caractères min.)' });
+  if (typeof pass !== 'string' || pass.length < 6) return res.status(400).json({ error: 'Mot de passe trop court (6 caractères min.)' });
+  if (state.subs.length >= 2000) return res.status(503).json({ error: 'Inscriptions indisponibles pour le moment' });
+  if (state.subs.some((x) => x.name.trim().toLowerCase() === nm.toLowerCase())) return res.status(409).json({ error: 'Ce nom est déjà pris' });
+  const refIn = str(ref, 40).trim().toLowerCase();
+  const parent = refIn ? state.subs.find((x) => isActive(x) && x.id.toLowerCase() === refIn) : null;
+  if (refIn && !parent) return res.status(400).json({ error: 'Code de parrainage invalide' });
+  let code;
+  do { code = crypto.randomBytes(5).toString('hex').toUpperCase().slice(0, 8); } while (state.subs.some((x) => x.code === code));
+  const approve = st.signupApprove !== false;
+  const sub = { id: uid(), name: nm, code, pass: hashPass(pass.slice(0, 100)), selfReg: true, ...(approve ? { status: 'pending' } : {}), links: cleanLinks(st.signupLinks), commission: num(st.signupComm, 30), landing: '', referrer: parent ? parent.id : '', created: now };
+  hits.push(now); regHits.set(req.ip, hits);
+  state.subs.push(sub);
+  await saveState();
+  alertAdmin((approve ? '🆕 Nouvelle inscription à valider : ' : '🆕 Nouvelle inscription : ') + nm + (parent ? ' (parrainé par ' + parent.name + ')' : ''), approve ? '🆕 Inscription à valider' : '🆕 Nouvelle inscription', nm + (parent ? ' — parrainé par ' + parent.name : ''), 'subs');
+  res.json({ ok: true, id: sub.id, pending: approve });
+});
+
+// Admin : accepter / refuser / supprimer une inscription
+const pendingSub = (id) => state.subs.find((x) => x.id === id && !isActive(x));
+app.post('/api/signup/:id/accept', need('a'), async (req, res) => {
+  const s = pendingSub(req.params.id);
+  if (!s) return res.status(404).json({ error: 'Inscription introuvable' });
+  delete s.status; await saveState();
+  tg('✅ Inscription acceptée : ' + s.name);
+  res.json({ ok: true });
+});
+app.post('/api/signup/:id/refuse', need('a'), async (req, res) => {
+  const s = pendingSub(req.params.id);
+  if (!s) return res.status(404).json({ error: 'Inscription introuvable' });
+  s.status = 'refused'; await saveState(); res.json({ ok: true });
+});
+app.delete('/api/signup/:id', need('a'), async (req, res) => {
+  const s = pendingSub(req.params.id);
+  if (!s) return res.status(404).json({ error: 'Inscription introuvable' });
+  state.subs = state.subs.filter((x) => x.id !== s.id);
+  delete state.msgs[s.id]; delete state.rewardsClaimed[s.id]; delete state.push[s.id];
+  await saveState(); res.json({ ok: true });
+});
 app.get('/favicon.ico', (_, res) => res.redirect(301, '/assets/favicon-32.png'));
 app.get('/manifest.webmanifest', (_, res) => {
   const st = state.settings;
   res.type('application/manifest+json').json({
-    name: st.brand, short_name: st.brand.slice(0, 12), start_url: '/', scope: '/', display: 'standalone',
+    id: '/', name: st.brand, short_name: st.brand.slice(0, 12), start_url: '/', orientation: 'any', scope: '/', display: 'standalone',
     background_color: '#000000', theme_color: '#000000', lang: 'fr',
     icons: [
       { src: '/assets/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
@@ -380,7 +614,7 @@ app.get('/manifest.webmanifest', (_, res) => {
 app.get('/', (_, res) => {
   const st = state.settings;
   let html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-  const b = { brand: st.brand, colorA: st.colorA, colorB: st.colorB, logo: st.logo };
+  const b = { brand: st.brand, colorA: st.colorA, colorB: st.colorB, logo: st.logo, signupOn: st.signupOn !== false };
   html = html.replace('<title>AFFIX</title>', '<title>' + escHtml(st.brand) + '</title>')
     .replace('</head>', '<style>:root{--a:' + st.colorA + ';--b:' + st.colorB + '}</style><script>window.BRAND=' + JSON.stringify(b).replace(/</g, '\\u003c') + '</script></head>');
   res.set('Cache-Control', 'no-cache'); res.type('html').send(html);
@@ -388,5 +622,5 @@ app.get('/', (_, res) => {
 app.get('/health', (_, res) => res.json({ ok: true, storage: pool ? 'postgres' : 'fichier', subs: state.subs.length, events: events.length }));
 
 initStore().then(() => {
-  app.listen(process.env.PORT || 3000, () => console.log('AFFIX OK — stockage : ' + (pool ? 'Postgres' : 'fichiers')));
+  app.listen(PORT, () => console.log('AFFIX OK — stockage : ' + (pool ? 'Postgres' : 'fichiers')));
 }).catch((e) => { console.error('Init échouée', e); process.exit(1); });
