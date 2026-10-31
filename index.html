@@ -496,10 +496,7 @@ async function pushToggle(){
  }catch(e){PUSH.st='off';toast(e.message&&e.message!=='Failed to fetch'?e.message:"Impossible d'activer les notifications");try{await pushCheck()}catch(x){}}
  render()}
 async function pushTest(){try{await api('/api/push/test','POST',{});toast('Test envoyé — regarde tes notifications')}catch(e){toast(e.message)}}
-function pushDetach(){ // à la déconnexion : cet appareil ne reçoit plus les notifications de ce compte
- if(!auth||!pushSupported())return;const h=hdrs();
- navigator.serviceWorker.getRegistration().then(r=>r&&r.pushManager.getSubscription()).then(sub=>{if(sub)fetch('/api/push/unsubscribe',{method:'POST',headers:h,body:JSON.stringify({endpoint:sub.endpoint}),keepalive:true})}).catch(()=>{})}
-function userLogout(){pushDetach();logout()}
+function userLogout(){logout()}
 function pushCard(){
  const st=PUSH.st,on=st==='on',txt={chk:'Vérification…',on:'Activées sur cet appareil. Tu es alerté en temps réel.',off:isAdm()?'Reçois une alerte pour chaque nouveau message, retrait ou inscription.':'Reçois une alerte pour chaque message, FTD, annonce ou paiement.',busy:'Un instant…',ios:"Sur iPhone, installe d'abord l'application sur ton écran d'accueil.",denied:'Bloquées par ton navigateur : autorise-les dans les réglages du site.',unsupported:'Non disponibles sur ce navigateur.'}[st];
  return `<div class="card" style="padding:14px 18px;margin-bottom:15px"><label class="chk" style="margin:0"><input type="checkbox" ${on?'checked':''} ${st==='busy'||st==='chk'?'disabled':''} onchange="pushToggle()"><i class="sw"></i><span><b style="display:flex;gap:6px;align-items:center"><span style="color:var(--ic)">${ic.bell}</span>Notifications</b><small style="color:var(--dim);font-size:12px;line-height:1.4;display:block;margin-top:2px">${txt}</small></span></label>${on?`<div style="margin-top:10px"><button class="btn g s n" onclick="pushTest()">Envoyer un test</button></div>`:''}</div>`}
