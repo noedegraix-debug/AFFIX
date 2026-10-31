@@ -163,9 +163,13 @@ async function sendPush(list, p) {
   removeEndpoints(dead);
   return ok;
 }
-const pushMember = (id, p) => { const l = state.push[id]; if (l && l.length) sendPush(l.slice(), p).catch(() => {}); };
+const pushMember = async (id, p) => { const l = state.push[id]; if (!l || !l.length) return 0; try { return await sendPush(l.slice(), p); } catch (e) { return 0; } };
 const pushAdmin = (p) => { if (state.adminPush.length) sendPush(state.adminPush.slice(), p).catch(() => {}); };
-const pushAllMembers = (p) => { for (const s of state.subs) if (isActive(s)) pushMember(s.id, p); };
+const pushAllMembers = async (p) => {
+  const act = state.subs.filter(isActive);
+  const r = await Promise.all(act.map((s) => pushMember(s.id, p)));
+  return { reached: r.filter((n) => n > 0).length, total: act.length };
+};
 // Alerte admin : Telegram (si configuré) + push sur ses appareils
 const alertAdmin = (tgText, title, body, page) => { tg(tgText); pushAdmin({ title, body, page }); };
 const eurS = (n) => (Math.round((+n || 0) * 100) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
@@ -318,8 +322,10 @@ app.put('/api/config', need('a'), async (req, res) => {
   }
   if (Array.isArray(b.subs)) { for (const id of Object.keys(state.push)) if (!state.subs.some((x) => x.id === id)) delete state.push[id]; }
   await saveState();
-  res.json({ ok: true });
-  if (newAnn.length) pushAllMembers({ title: '📣 Annonce', body: newAnn[0].text, page: 'home' });
+  let annPush = null;
+  if (newAnn.length) annPush = await pushAllMembers({ title: '📣 Annonce', body: newAnn[0].text, page: 'home' });
+  res.json({ ok: true, annPush });
+  if (annPush) pushAdmin({ title: annPush.reached ? '✅ Annonce envoyée' : '⚠️ Annonce non reçue', body: annPush.reached + ' membre(s) notifié(s) sur ' + annPush.total + (annPush.reached < annPush.total ? ' (les autres n\'ont pas activé les notifications)' : ''), page: 'home', tag: 'confirm' });
 });
 
 app.post('/api/msg/:id', need('a'), async (req, res) => {
@@ -327,15 +333,20 @@ app.post('/api/msg/:id', need('a'), async (req, res) => {
   const text = str(req.body && req.body.text, 2000).trim();
   if (!sub || !text) return res.status(400).json({ error: 'Message invalide' });
   (state.msgs[sub.id] = state.msgs[sub.id] || []).push({ from: 'a', text, t: Date.now() });
-  await saveState(); res.json({ ok: true });
-  pushMember(sub.id, { title: '💬 Nouveau message', body: text, page: 'msg' });
+  await saveState();
+  const n = await pushMember(sub.id, { title: '💬 Nouveau message', body: text, page: 'msg' });
+  res.json({ ok: true, pushed: n });
+  pushAdmin(n ? { title: '✅ Notification envoyée', body: 'Ton message a bien été envoyé à ' + sub.name + '.', page: 'msg', tag: 'confirm' } : { title: '⚠️ Notification non reçue', body: sub.name + ' n\'a pas activé les notifications (il verra ton message en ouvrant l\'app).', page: 'msg', tag: 'confirm' });
 });
 app.post('/api/pay/:id/paid', need('a'), async (req, res) => {
   const p = state.payments.find((x) => x.id === req.params.id);
   if (!p) return res.status(404).json({ error: 'Introuvable' });
   p.status = 'paid'; p.paidAt = Date.now();
-  await saveState(); res.json({ ok: true });
-  pushMember(p.subId, { title: '✅ Paiement effectué', body: (p.type === 'r' ? (p.label || 'Reward') : 'Ton retrait') + ' de ' + eurS(p.amount) + ' a été payé.', page: p.type === 'r' ? 'rew' : 'bal' });
+  await saveState();
+  const who = (state.subs.find((x) => x.id === p.subId) || {}).name || 'le membre';
+  const n = await pushMember(p.subId, { title: '✅ Paiement effectué', body: (p.type === 'r' ? (p.label || 'Reward') : 'Ton retrait') + ' de ' + eurS(p.amount) + ' a été payé.', page: p.type === 'r' ? 'rew' : 'bal' });
+  res.json({ ok: true, pushed: n });
+  pushAdmin(n ? { title: '✅ Notification envoyée', body: 'Paiement de ' + eurS(p.amount) + ' : ' + who + ' a été prévenu.', page: 'pay', tag: 'confirm' } : { title: '⚠️ Notification non reçue', body: who + ' n\'a pas activé les notifications (paiement bien marqué comme payé).', page: 'pay', tag: 'confirm' });
 });
 app.delete('/api/pay/:id', need('a'), async (req, res) => {
   state.payments = state.payments.filter((x) => x.id !== req.params.id);
